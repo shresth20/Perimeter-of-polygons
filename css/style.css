@@ -90,6 +90,14 @@
   --button-bg:   var(--ice-1);
   --button-text: var(--ink);
 
+  /* Start: a yellow button, the gold of "Polygons" in the welcome art. */
+  --start-face-1: #FFF3B0;
+  --start-face-2: var(--gold);
+  --start-face-3: #F2AE24;
+  --start-rim:    #FFF6CC;
+  --start-wall:   var(--orange-deep);
+  --start-text:   #7A3B05;
+
   --pill-border:   var(--ice-deep);
   --pill-face-mid: color-mix(in srgb, var(--ice-2) 45%, var(--snow));
   --pill-face-low: color-mix(in srgb, var(--ice-3) 55%, var(--snow));
@@ -111,8 +119,8 @@
   --font-body: "Baloo 2", system-ui, sans-serif;
 
   --art-page: url("../assets/images/bg.jpg");
-  /* The welcome's painting (title and bird drawn in). Its own snowflakes are
-     painted out of welcome-screen.png; js/scenery.js lets them fall instead. */
+  /* The welcome's painting (title and bird drawn in): welcome.png as a jpg.
+     js/scenery.js lets snowflakes fall over it. */
   --art-welcome: url("../assets/images/welcome-bg.jpg");
 
   /* ---- stacking ---------------------------------------------------------- */
@@ -206,8 +214,8 @@ body {
       color-mix(in srgb, var(--ice-2) 66%, transparent) 100%);
   -webkit-backdrop-filter: blur(7px) saturate(1.1);
   backdrop-filter: blur(7px) saturate(1.1);
+  /* No top-only highlight here: the rim is the same 3px on every side. */
   box-shadow:
-    inset 0 2px 0 var(--snow),
     inset 0 0 0 1px color-mix(in srgb, var(--ice-3) 45%, transparent),
     0 0 14px 0 var(--glow-board),
     0 0 34px 8px var(--glow-board-soft),
@@ -290,26 +298,6 @@ body {
   color: var(--ink);
 }
 .prompt__line .type { white-space: pre-wrap; }
-
-/* The "1 of 5" counter, pinned to the board's top-right corner. */
-.counter {
-  position: absolute;
-  top: clamp(8px, 1.8vh, 18px);
-  right: clamp(10px, 2.2%, 28px);
-  z-index: var(--z-header);
-  padding: .18em .8em .22em;
-  border-radius: 999px;
-  border: 2px solid var(--ice-3);
-  background: color-mix(in srgb, var(--snow) 85%, var(--ice-2));
-  font-family: var(--font-display);
-  font-size: clamp(12px, 2.1vh, 20px);
-  letter-spacing: .4px;
-  color: var(--ice-ink);
-  box-shadow: 0 3px 0 color-mix(in srgb, var(--ice-3) 70%, transparent), 0 6px 14px var(--shadow-soft);
-  opacity: 0;
-  pointer-events: none;
-}
-.counter[hidden] { display: none; }
 
 /* ==========================================================================
    The figure (one SVG) and the DOM layer over it
@@ -614,9 +602,8 @@ body {
   white-space: nowrap;
 }
 
-/* The painting's snowflakes, alive: they fall slowly from the sky. The box
-   is sized and placed by js/scenery.js to sit exactly over the cover-fitted
-   art, so a flake's first spot is where it was painted. */
+/* Snowflakes falling slowly from the painting's sky. The box is sized and
+   placed by js/scenery.js to sit exactly over the cover-fitted art. */
 .welcome__flakes {
   position: absolute;
   left: 0;
@@ -695,18 +682,30 @@ body {
   grid-row: 2;
   --edge: 5px;
   --sink: 0px;
+  /* the 3D wall and the glow, gold for this button (start-pulse reads them) */
+  --horizon: var(--start-wall);
+  --glow-board-soft: color-mix(in srgb, var(--gold) 55%, transparent);
+  --glow-board-dim: color-mix(in srgb, var(--gold) 28%, transparent);
+  --button-text: var(--start-text);
   translate: 0 var(--sink);
   align-self: center;
   justify-self: center;
+  /* The button keeps the size --start-fs gives it; only the word is bigger
+     (x --start-grow): the line box stays at the old height and the side
+     padding gives back what the wider word takes ("Start" is ~2.4em wide). */
+  --start-fs: clamp(30px, 5vh, 40px);
+  --start-grow: 1.3;
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: clamp(30px, 5vh, 40px);
+  font-size: calc(var(--start-fs) * var(--start-grow));
+  line-height: calc(var(--start-fs) * 1.14);
   letter-spacing: 1.5px;
   color: var(--button-text);
-  padding: clamp(8px, 1.8vh, 18px) clamp(28px, 5vw, 55px);
-  border: 4px solid var(--snow);
+  padding: clamp(8px, 1.8vh, 18px)
+           calc(clamp(28px, 5vw, 55px) - var(--start-fs) * (var(--start-grow) - 1) * 1.2);
+  border: 4px solid var(--start-rim);
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--snow) 0%, var(--button-bg) 55%, var(--ice-2) 100%);
+  background: linear-gradient(180deg, var(--start-face-1) 0%, var(--start-face-2) 50%, var(--start-face-3) 100%);
   box-shadow:
     0 var(--edge) 0 var(--horizon),
     0 0 14px 2px var(--glow-board-soft),

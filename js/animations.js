@@ -430,39 +430,6 @@
     return tl;
   }
 
-  /* ---- the buckets ---------------------------------------------------------
-     The two buckets popping in, and a shape dropping into one: it flies
-     the rest of the way, shrinks into the bucket and is gone. */
-  function bucketsIn(buckets) {
-    var tl = M.timeline({ willChange: buckets.map(function (b) { return b.g; }), willChangeValue: 'transform, opacity' });
-    buckets.forEach(function (b, i) {
-      var c = b.centre;
-      tl.fromTo(b.g, { opacity: 0, scale: 0.7, transformOrigin: c.x + 'px ' + c.y + 'px' },
-        { opacity: 1, scale: 1, duration: M.dur(0.42), ease: M.POP }, M.gap(i * 0.12));
-      tl.call(pop, null, M.gap(i * 0.12));
-    });
-    tl.call(function () { M.set(buckets.map(function (b) { return b.g; }), { clearProps: 'opacity' }); buckets.forEach(function (b) { b.g.classList.add('is-shown'); }); });
-    return tl;
-  }
-  function bucketsOut(buckets) {
-    var gs = buckets.map(function (b) { return b.g; });
-    var tl = M.timeline({
-      willChange: gs, willChangeValue: 'opacity',
-      revert: function () { gs.forEach(function (g) { g.classList.remove('is-shown', 'is-right', 'is-wrong', 'is-over'); }); M.set(gs, { clearProps: 'opacity,transform' }); }
-    });
-    tl.to(gs, { opacity: 0, duration: M.dur(0.3), ease: 'power2.in' });
-    return tl;
-  }
-  function bucketRight(bucket) {
-    bucket.g.classList.remove('is-wrong', 'is-over');
-    bucket.g.classList.add('is-right');
-    sfx('correct');
-    var c = bucket.centre;
-    var tl = M.timeline({ revert: function () { M.set(bucket.g, { clearProps: 'transform' }); } });
-    tl.to(bucket.g, { scale: 1.06, transformOrigin: c.x + 'px ' + c.y + 'px', duration: M.dur(0.14), ease: 'power2.out' })
-      .to(bucket.g, { scale: 1, duration: M.dur(0.36), ease: M.POP });
-    return tl;
-  }
   var SHAKE = [-5, 5, -5, 5, -4, 4, 0];
   function shake(tl, el, seconds) {
     var each = M.dur(seconds || 0.3) / SHAKE.length;
@@ -470,40 +437,98 @@
       tl.to(el, { x: x, duration: each, ease: i === SHAKE.length - 1 ? 'power2.out' : 'none' });
     });
   }
-  function bucketWrong(bucket) {
-    bucket.g.classList.remove('is-over');
-    bucket.g.classList.add('is-wrong');
+  /* ---- the swipe sort --------------------------------------------------------
+     Two side panels sliding in from their own edges; the ice card rising
+     into the middle; the card leaning a panel in as it nears, flying into
+     it when it is right (and staying there, small), springing home when it
+     is wrong. Every card transform is about the card's own centre (set as
+     its svgOrigin when it is built). */
+  function zoneOrigin(z) { return z.centre.x + ' ' + z.centre.y; }
+  function zonesIn(zones) {
+    var gs = zones.map(function (z) { return z.g; });
+    var tl = M.timeline({ willChange: gs, willChangeValue: 'transform, opacity' });
+    zones.forEach(function (z, i) {
+      tl.fromTo(z.g, { opacity: 0, x: z.side === 'right' ? 60 : -60, svgOrigin: zoneOrigin(z) },
+        { opacity: 1, x: 0, duration: M.dur(0.5), ease: M.POP }, M.gap(i * 0.12));
+      tl.call(pop, null, M.gap(i * 0.12));
+    });
+    tl.call(function () { M.set(gs, { clearProps: 'opacity' }); gs.forEach(function (g) { g.classList.add('is-shown'); }); });
+    return tl;
+  }
+  function zonesOut(zones) {
+    var gs = zones.map(function (z) { return z.g; });
+    var kept = zones.reduce(function (a, z) { return a.concat(z.kept.map(function (c) { return c.g; })); }, []);
+    var all = gs.concat(kept);
+    var tl = M.timeline({ willChange: all, willChangeValue: 'opacity' });
+    tl.to(all, { opacity: 0, duration: M.dur(0.3), ease: 'power2.in' });
+    return tl;
+  }
+  function zoneLean(z, on) {
+    return M.to(z.g, { scale: on ? 1.05 : 1, svgOrigin: zoneOrigin(z), duration: M.dur(on ? 0.16 : 0.2),
+                       ease: on ? 'power2.out' : 'power2.inOut', overwrite: 'auto' });
+  }
+  function zoneRight(z) {
+    z.g.classList.remove('is-wrong', 'is-over');
+    z.g.classList.add('is-right');
+    sfx('correct');
+    var tl = M.timeline({ revert: function () { z.g.classList.remove('is-right'); M.set(z.g, { clearProps: 'transform' }); } });
+    tl.to(z.g, { scale: 1.06, svgOrigin: zoneOrigin(z), duration: M.dur(0.14), ease: 'power2.out' }, M.gap(0.62))
+      .to(z.g, { scale: 1, duration: M.dur(0.36), ease: M.POP })
+      .to({}, { duration: M.dur(0.4) });
+    return tl;
+  }
+  function zoneWrong(z) {
+    z.g.classList.remove('is-over');
+    z.g.classList.add('is-wrong');
     sfx('wrong');
     var tl = M.timeline({
-      willChange: bucket.g, willChangeValue: 'transform',
-      revert: function () { bucket.g.classList.remove('is-wrong'); M.set(bucket.g, { clearProps: 'transform' }); }
+      willChange: z.g, willChangeValue: 'transform',
+      revert: function () { z.g.classList.remove('is-wrong'); M.set(z.g, { clearProps: 'transform' }); }
     });
-    shake(tl, bucket.g);
+    tl.to(z.g, { scale: 1, duration: M.dur(0.12), ease: 'power2.out' }, 0);
+    shake(tl, z.g);
     tl.to({}, { duration: M.dur(0.5) });
     return tl;
   }
-  /* The shape in the hand, let go over nothing: home. Over its bucket:
-     into it. dx/dy are figure units from where it stands now. */
-  function shapeHome(g) {
-    return M.to(g, { x: 0, y: 0, scale: 1, duration: M.dur(0.4), ease: 'power3.out', overwrite: 'auto' });
-  }
-  function shapeInto(g, dx, dy, origin) {
-    var x = gsap.getProperty(g, 'x') || 0, y = gsap.getProperty(g, 'y') || 0;
-    var tl = M.timeline({ willChange: g, willChangeValue: 'transform, opacity' });
-    tl.to(g, { x: x + dx, y: y + dy, scale: 0.35, transformOrigin: origin, opacity: 0,
-               duration: M.dur(0.55), ease: 'power2.inOut', overwrite: 'auto' });
-    tl.call(pop, null, M.gap(0.5));
+  function swipeIn(card) {
+    var tl = M.timeline({ willChange: card.g, willChangeValue: 'transform, opacity' });
+    tl.fromTo(card.g, { opacity: 0, y: 34, scale: 0.94 },
+      { opacity: 1, y: 0, scale: 1, duration: M.dur(0.45), ease: M.OUT });
+    tl.call(function () { M.set(card.g, { clearProps: 'opacity' }); });
     return tl;
   }
-  /* The shape, refused: a head-shake where it is. */
-  function shapeWrong(g) {
-    sfx('wrong');
-    var x = gsap.getProperty(g, 'x') || 0;
-    var tl = M.timeline({ willChange: g, willChangeValue: 'transform' });
+  /* let go short of a panel: back to the middle, with a little overshoot */
+  function swipeHome(card) {
+    return M.to(card.g, { x: 0, y: 0, rotation: 0, scale: 1, duration: M.dur(0.38), ease: 'back.out(1.6)', overwrite: 'auto' });
+  }
+  /* sorted: into the panel, shrinking onto its shelf; the card's ice melts
+     away on the way and the shape alone is kept */
+  function swipeInto(card, dx, dy, k) {
+    var x = gsap.getProperty(card.g, 'x') || 0;
+    var tl = M.timeline({ willChange: [card.g, card.face], willChangeValue: 'transform, opacity' });
+    tl.to(card.g, { x: x + (dx - x) * 0.18, y: -18, rotation: dx < 0 ? -6 : 6, scale: 1.06,
+                    duration: M.dur(0.16), ease: 'power2.out', overwrite: 'auto' })
+      .to(card.g, { x: dx, y: dy, rotation: 0, scale: k, duration: M.dur(0.55), ease: 'power2.inOut' })
+      .to(card.face, { opacity: 0, duration: M.dur(0.34), ease: 'power2.in' }, M.gap(0.2));
+    tl.call(pop, null, '>-0.05');
+    return tl;
+  }
+  /* refused: home, then a head-shake where it lands */
+  function swipeWrong(card) {
+    var tl = M.timeline({ willChange: card.g, willChangeValue: 'transform' });
+    tl.to(card.g, { x: 0, y: 0, rotation: 0, scale: 1, duration: M.dur(0.32), ease: 'power3.out', overwrite: 'auto' });
     var each = M.dur(0.3) / SHAKE.length;
     SHAKE.forEach(function (s, i) {
-      tl.to(g, { x: x + s, duration: each, ease: i === SHAKE.length - 1 ? 'power2.out' : 'none' });
+      tl.to(card.g, { x: s * 1.4, rotation: s * 0.4, duration: each, ease: i === SHAKE.length - 1 ? 'power2.out' : 'none' });
     });
+    return tl;
+  }
+  /* a tap on the card: a small sway left and right -- it goes sideways */
+  function swipeNudge(card) {
+    var tl = M.timeline({ willChange: card.g, willChangeValue: 'transform' });
+    tl.to(card.g, { x: -26, rotation: -4, duration: M.dur(0.18), ease: 'power2.out', overwrite: 'auto' })
+      .to(card.g, { x: 26, rotation: 4, duration: M.dur(0.26), ease: 'power2.inOut' })
+      .to(card.g, { x: 0, y: 0, rotation: 0, scale: 1, duration: M.dur(0.3), ease: 'back.out(1.6)' });
     return tl;
   }
 
@@ -625,19 +650,6 @@
   /* A word that is answered glows once. */
   function emphasise(el) {
     return M.correct(el);
-  }
-
-  /* ---- the counter --------------------------------------------------------- */
-  function counterIn(el) {
-    el.removeAttribute('hidden');
-    var tl = M.timeline({ willChange: el, willChangeValue: 'transform, opacity' });
-    tl.fromTo(el, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: M.dur(0.3), ease: 'power2.out' });
-    return tl;
-  }
-  function counterOut(el) {
-    var tl = M.timeline({ revert: function () { el.setAttribute('hidden', ''); M.set(el, { clearProps: 'opacity,transform' }); } });
-    tl.to(el, { opacity: 0, duration: M.dur(0.2), ease: 'power2.in' });
-    return tl;
   }
 
   /* The rangoli's lights, switched on one after another round the edge. */
@@ -817,13 +829,13 @@
     pulseHold: pulseHold, pulseRelease: pulseRelease, partPulse: partPulse,
     perimOn: perimOn, areaOn: areaOn, highlightOff: highlightOff,
     walk: walk, morphShape: morphShape, moveGroup: moveGroup, slideGroup: slideGroup, pushSide: pushSide,
-    bucketsIn: bucketsIn, bucketsOut: bucketsOut, bucketRight: bucketRight, bucketWrong: bucketWrong,
-    shapeHome: shapeHome, shapeInto: shapeInto, shapeWrong: shapeWrong,
+    zonesIn: zonesIn, zonesOut: zonesOut, zoneLean: zoneLean, zoneRight: zoneRight, zoneWrong: zoneWrong,
+    swipeIn: swipeIn, swipeHome: swipeHome, swipeInto: swipeInto, swipeWrong: swipeWrong, swipeNudge: swipeNudge,
     boxIn: boxIn, boxRight: boxRight, boxWrong: boxWrong,
     trayIn: trayIn, trayOut: trayOut, choiceRight: choiceRight, choiceWrong: choiceWrong,
     chipHome: chipHome, chipDock: chipDock,
     cardIn: cardIn, cardsIn: cardsIn, cardOut: cardOut, rowIn: rowIn, termIn: termIn, ruleIn: ruleIn, emphasise: emphasise,
-    counterIn: counterIn, counterOut: counterOut, lightsOn: lightsOn,
+    lightsOn: lightsOn,
     clearFigure: clearFigure,
     bubbleArm: bubbleArm, bubbleIn: bubbleIn, bubbleOut: bubbleOut,
     hopUp: hopUp, hopDown: hopDown, landOn: landOn, springOff: springOff,

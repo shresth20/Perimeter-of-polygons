@@ -1,5 +1,5 @@
 /* ==========================================================================
-   The figure: shapes, their sides and labels, buckets, name boxes -- and the
+   The figure: shapes, their sides and labels, the swipe sort, name boxes -- and the
    DOM cards, panes and sliders laid over the stage.
    ========================================================================== */
 
@@ -105,64 +105,57 @@
 .skate__trail { stroke: var(--snow); stroke-width: 4; stroke-opacity: .55; }
 .skate__head  { stroke: var(--snow); stroke-width: 7; }
 
-/* The join inside a composite shape: dashed, in a soft ink -- the line we
-   do NOT walk along. */
-.inner-line {
-  fill: none;
-  stroke: var(--ink-soft);
-  stroke-width: 3.5;
-  stroke-dasharray: 9 8;
-  stroke-linecap: round;
+/* ---- The swipe sort: two side panels and a card --------------------------
+   A frosted panel at each side, its name on a band, a shelf below where the
+   sorted cards are kept. The left one warm, the right one lavender, so the
+   two sides read apart at a glance. The card in the middle is ice, and
+   follows the finger sideways: only the shape shows, over an invisible
+   grab area. */
+.zone {
+  --zone: var(--orange);
+  --zone-deep: var(--orange-deep);
   opacity: 0;
+  outline: none;
+  cursor: pointer;
 }
-.inner-line.is-no { stroke: var(--wrong-border); }
-
-/* The lights round the rangoli. */
-.light {
-  fill: var(--gold);
-  stroke: var(--snow);
-  stroke-width: 1.5;
-  opacity: 0;
-}
-
-/* ---- A bucket ----------------------------------------------------------
-   An ice bucket: a glassy trapezoid with a rim, and its name on a band. */
-.bucket { opacity: 0; }
-.bucket.is-shown { opacity: 1; }
-.bucket__body {
-  fill: color-mix(in srgb, var(--ice-2) 70%, var(--snow));
-  stroke: var(--ice-deep);
-  stroke-width: 3.5;
-  stroke-linejoin: round;
+.zone--right { --zone: var(--lavender); --zone-deep: var(--lavender-deep); }
+.zone.is-shown { opacity: 1; }
+.zone__shadow { fill: color-mix(in srgb, var(--zone-deep) 30%, transparent); }
+.zone__body {
+  fill: color-mix(in srgb, var(--zone) 22%, var(--snow));
+  stroke: var(--zone);
+  stroke-width: 5;
   transition: fill .25s ease, stroke .25s ease;
 }
-.bucket__rim {
-  fill: color-mix(in srgb, var(--ice-3) 60%, var(--snow));
-  stroke: var(--ice-deep);
-  stroke-width: 3.5;
-  transition: fill .25s ease, stroke .25s ease;
+.zone__band { fill: color-mix(in srgb, var(--zone) 34%, var(--snow)); }
+.zone__label {
+  fill: color-mix(in srgb, var(--zone-deep) 55%, var(--ink));
+  font-size: 32px;
 }
-.bucket__sheen { fill: var(--snow); opacity: .55; }
-.bucket__label {
-  fill: var(--ink);
-  font-size: 28px;
-  paint-order: stroke fill;
-  stroke: var(--snow);
-  stroke-width: 6;
+.zone__shelf {
+  fill: color-mix(in srgb, var(--snow) 55%, transparent);
+  stroke: color-mix(in srgb, var(--zone) 55%, var(--snow));
+  stroke-width: 2.5;
+  stroke-dasharray: 8 7;
 }
-.bucket.is-over .bucket__body { fill: color-mix(in srgb, var(--gold) 35%, var(--snow)); stroke: var(--gold-deep); }
-.bucket.is-over .bucket__rim  { stroke: var(--gold-deep); }
-.bucket.is-right .bucket__body { fill: color-mix(in srgb, var(--right-fill) 40%, var(--snow)); stroke: var(--right-border); }
-.bucket.is-right .bucket__rim  { stroke: var(--right-border); }
-.bucket.is-wrong .bucket__body { fill: color-mix(in srgb, var(--wrong-fill) 40%, var(--snow)); stroke: var(--wrong-border); }
-.bucket.is-wrong .bucket__rim  { stroke: var(--wrong-border); }
+.zone.is-over .zone__body,
+.zone:focus-visible .zone__body { fill: color-mix(in srgb, var(--zone) 38%, var(--snow)); stroke: var(--zone-deep); stroke-width: 6; }
+.zone.is-right .zone__body { fill: color-mix(in srgb, var(--right-fill) 32%, var(--snow)); stroke: var(--right-border); }
+.zone.is-wrong .zone__body { fill: color-mix(in srgb, var(--wrong-fill) 32%, var(--snow)); stroke: var(--wrong-border); }
 
-/* The shape being sorted, in the hand. */
-.shape.is-draggable { cursor: grab; }
-.shape.is-draggable .shape__hitbox { pointer-events: all; cursor: grab; }
+.swipe-card { outline: none; touch-action: none; }
+.swipe-card.is-live { cursor: grab; }
+.swipe-card.is-lifted { cursor: grabbing; }
+.swipe-card .shape { pointer-events: none; }
+.swipe-card__hit {
+  fill: transparent;
+  pointer-events: all;
+  stroke: transparent;
+  stroke-width: 4;
+  stroke-dasharray: 10 8;
+}
+.swipe-card:focus-visible .swipe-card__hit { stroke: var(--ice-ink); }
 .shape__hitbox { fill: transparent; pointer-events: none; outline: none; }
-.shape.is-lifted { cursor: grabbing; }
-.shape.is-picked .shape__outline { stroke: var(--gold-deep); }
 
 /* ---- A name box under a figure ----------------------------------------- */
 .q-box { opacity: 0; transition: opacity .34s ease; outline: none; pointer-events: none; }
@@ -299,20 +292,6 @@
   color: transparent;
 }
 
-/* The pane: the right half of the stage, the shape standing left of it. */
-.pane {
-  position: absolute;
-  right: 1%;
-  top: 2%;
-  width: 46%;
-}
-.card--push .card__title { margin-bottom: 0; }
-.card--push .card__sub { margin: .1em 0; }
-.card--push .slider { margin: .15em 0 .3em; font-size: clamp(12px, 2.1vh, 19px); }
-.card--push .card__row { font-size: clamp(15px, 2.9vh, 28px); margin: .05em 0; }
-.pane .card { position: relative; opacity: 1; }
-.pane[hidden] { display: none; }
-
 /* A grid of summary cards across the stage. */
 .grid {
   position: absolute;
@@ -412,13 +391,8 @@
 .slider.is-done .slider__thumb { border-color: var(--right-border); animation: none; }
 .slider.is-done .slider__fill { background: linear-gradient(90deg, var(--right-fill), var(--right-border)); }
 .slider.is-done .slider__track { cursor: default; pointer-events: none; }
-.slider--pink { --c: var(--pink-deep); }
-.slider--purple { --c: var(--lavender-deep); }
 @keyframes thumb-call {
   0%, 100% { box-shadow: 0 .2em .5em var(--shadow-deep), 0 0 0 0 color-mix(in srgb, var(--c, var(--ice-deep)) 0%, transparent); }
   50%      { box-shadow: 0 .2em .5em var(--shadow-deep), 0 0 0 .4em color-mix(in srgb, var(--c, var(--ice-deep)) 40%, transparent); }
 }
 
-/* The L-shape's movable sides wear the sliders' inks. */
-.side--pink   { --c: var(--pink-deep); }
-.side--purple { --c: var(--lavender-deep); }

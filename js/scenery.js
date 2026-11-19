@@ -1,8 +1,8 @@
 /* ==========================================================================
  * scenery.js -- the snow
  * --------------------------------------------------------------------------
- * A few dozen flakes drifting down behind the whole lesson, and the welcome
- * painting's own snowflakes falling slowly from its sky. Plain GSAP, not
+ * A few dozen flakes drifting down behind the whole lesson, and snowflakes
+ * falling slowly from the sky of the welcome painting. Plain GSAP, not
  * Motion: these loops belong to the page, not to a scene, so a Replay must
  * not kill them. Nothing under reduced motion.
  * ========================================================================== */
@@ -57,24 +57,25 @@
   }
 
   /* ---- the welcome's snowflakes, falling --------------------------------
-     The painting (assets/images/welcome-bg.jpg, 1672 x 941) had five
-     snowflakes drawn on it; they are painted out and live here instead,
-     starting on the very spots they were drawn, then drifting down slowly,
-     turning and swaying, and coming back in from the top. More of the same
-     flakes and a dusting of small specks fill the sky around them.
+     Snowflakes fall slowly over the welcome painting
+     (assets/images/welcome-bg.jpg, 1672 x 941), turning and swaying, and
+     come back in from the top; a dusting of small specks falls further
+     away. The flakes' box sits exactly over the art, so they are sized and
+     placed in art pixels at any window size.
      One gsap.ticker loop, time-based, transform and opacity only. It does no
-     work while the welcome is hidden. Reduced motion: the five painted flakes
-     stand still where they were drawn. */
+     work while the welcome is hidden. Reduced motion: a few flakes stand
+     still in the sky. */
   var ART_W = 1672, ART_H = 941;
-  var PAINTED = [               /* centre (art px) and diameter (art px)      */
-    { x: 768, y: 62, d: 50 }, { x: 1327, y: 106, d: 50 }, { x: 333, y: 312, d: 66 },
-    { x: 1399, y: 437, d: 70 }, { x: 1051, y: 611, d: 50 }
+  var STILL = [                 /* where flakes stand under reduced motion,
+                                   and where five of them start (art px)      */
+    { x: 250, y: 120, d: 52 }, { x: 1400, y: 150, d: 50 }, { x: 640, y: 70, d: 44 },
+    { x: 1500, y: 470, d: 62 }, { x: 120, y: 520, d: 46 }
   ];
-  var EXTRA_FLAKES = 9;         /* more of the painted flakes, spread about  */
-  var SPECKS = 26;              /* small soft dots, further away             */
+  var EXTRA_FLAKES = 6;         /* more flakes, spread about the sky         */
+  var SPECKS = 18;              /* small soft dots, further away             */
 
-  /* The painted flake: six thick arms, each with one V of branches. */
-  var PAINTED_D = (function () {
+  /* The flake: six thick arms, each with one V of branches. */
+  var FLAKE6_D = (function () {
     var d = '';
     for (var k = 0; k < 6; k++) {
       var a = k * Math.PI / 3;
@@ -90,13 +91,13 @@
     return d.trim();
   })();
 
-  function paintedFlakeSvg() {
+  function flake6Svg() {
     var NS = 'http://www.w3.org/2000/svg';
     var s = document.createElementNS(NS, 'svg');
     s.setAttribute('viewBox', '-50 -50 100 100');
     s.setAttribute('class', 'wflake');
     var p = document.createElementNS(NS, 'path');
-    p.setAttribute('d', PAINTED_D);
+    p.setAttribute('d', FLAKE6_D);
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke', 'currentColor');
     p.setAttribute('stroke-width', '10');
@@ -140,7 +141,7 @@
     function make(kind, x, y, d) {
       var el;
       if (kind === 'speck') { el = document.createElement('i'); el.className = 'wflake wflake--speck'; }
-      else el = paintedFlakeSvg();
+      else el = flake6Svg();
       host.appendChild(el);
       var depth = kind === 'speck' ? 0.45 + Math.random() * 0.3 : Math.min(1, d / 66);
       var f = {
@@ -157,7 +158,7 @@
       return f;
     }
 
-    PAINTED.forEach(function (p) { make('flake', p.x, p.y, p.d); });
+    STILL.forEach(function (p) { make('flake', p.x, p.y, p.d); });
     if (!calm) {
       for (var i = 0; i < EXTRA_FLAKES; i++) {
         make('flake', Math.random() * ART_W, Math.random() * ART_H, 30 + Math.random() * 30);

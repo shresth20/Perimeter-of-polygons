@@ -134,15 +134,19 @@
      worked on. Storage can throw or come back empty -- a private window,
      cleared site data -- and an empty list is simply one the lesson fills
      in again as it is played. */
-  function load() {
+  /* The counts are kept with the scene list they were learned on: a scene
+     added, removed or renamed starts the list afresh, rather than handing
+     one scene's pages to whatever now sits at its number. */
+  function load(names) {
     try {
       var raw = sessionStorage.getItem(STORE);
       var got = raw ? JSON.parse(raw) : null;
-      return Object.prototype.toString.call(got) === '[object Array]' ? got : [];
+      if (!got || got.names !== names.join('|')) return [];
+      return Object.prototype.toString.call(got.counts) === '[object Array]' ? got.counts : [];
     } catch (e) { return []; }
   }
-  function save(counts) {
-    try { sessionStorage.setItem(STORE, JSON.stringify(counts)); } catch (e) {}
+  function save(counts, names) {
+    try { sessionStorage.setItem(STORE, JSON.stringify({ names: names.join('|'), counts: counts })); } catch (e) {}
   }
 
   function mount() {
@@ -155,7 +159,7 @@
     style();
 
     var names = Pages.levels();
-    var counts = load();
+    var counts = load(names);
     var at = 0, page = 0;
 
     function pagesIn(scene) { return Math.max(1, counts[scene] | 0); }
@@ -278,7 +282,7 @@
       where.pages.forEach(function (n, i) {
         if (n > (counts[i] | 0)) { counts[i] = n; grew = true; }
       });
-      if (grew) save(counts);
+      if (grew) save(counts, names);
 
       fill();
       pick.value = at + ':' + page;

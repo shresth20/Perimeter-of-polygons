@@ -45,7 +45,7 @@
       welcome: $('welcome'), title: $('welcomeTitle'), flakes: $('welcomeFlakes'), startBtn: $('startBtn'),
       frame: $('frame'), slotHero: $('slotHero'), bubble: $('bubble'), hopper: $('hopper'),
       board: $('board'), slotHeader: $('slotHeader'), promptLine: document.querySelector('.prompt__line'),
-      figure: $('figure'), layer: $('layer'), burst: $('figBurst'), counter: $('counter'),
+      figure: $('figure'), layer: $('layer'), burst: $('figBurst'),
       tray: $('tray'), choices: $('choices'), gate: $('gate'),
       nextBtn: $('nextBtn'), restartBtn: $('restartBtn')
     };
@@ -79,23 +79,60 @@
     box.g.setAttribute('aria-label', T('a11yBox'));
   }
 
-  /* ---- a bucket --------------------------------------------------------- */
-  function buildBucket(group, b) {
-    var w = b.w || 230, hh = b.h || 150, x = b.x, y = b.y;
-    var g = el('g', { 'class': 'bucket', 'data-name': b.name, tabindex: 0, role: 'button' });
-    g.setAttribute('aria-label', T('a11yBucket', { name: T(b.name) }));
-    var inset = w * 0.1;
-    var body = el('path', { 'class': 'bucket__body',
-      d: 'M' + x + ' ' + (y + 18) + ' L' + (x + w) + ' ' + (y + 18) + ' L' + (x + w - inset) + ' ' + (y + hh) +
-         ' Q' + (x + w / 2) + ' ' + (y + hh + 16) + ' ' + (x + inset) + ' ' + (y + hh) + ' Z' });
-    var sheen = el('path', { 'class': 'bucket__sheen',
-      d: 'M' + (x + 22) + ' ' + (y + 34) + ' L' + (x + 34) + ' ' + (y + 34) + ' L' + (x + 40) + ' ' + (y + hh - 24) + ' L' + (x + 30) + ' ' + (y + hh - 24) + ' Z' });
-    var rim = el('rect', { 'class': 'bucket__rim', x: x - 6, y: y, width: w + 12, height: 26, rx: 13 });
-    var label = el('text', { 'class': 'figure-label bucket__label', x: x + w / 2, y: y + hh * 0.62, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
-    label.textContent = T(b.name);
-    g.appendChild(body); g.appendChild(sheen); g.appendChild(rim); g.appendChild(label);
+  /* ---- a side panel, for the swipe sort -----------------------------------
+     z: { name, side: 'left'|'right', x, y, w, h, cap }. A tall frosted panel
+     with its name on a band at the top and a shelf below, where the cards
+     swiped into it are kept, small, in a row. `cap` is how many it will
+     hold (the seats are laid out for that many). */
+  var ZONE_W = 240, ZONE_H = 300, ZONE_Y = 58, ZONE_M = 26;
+  function buildZone(group, z) {
+    var w = z.w || ZONE_W, hh = z.h || ZONE_H, y = z.y == null ? ZONE_Y : z.y;
+    var x = z.x != null ? z.x : (z.side === 'right' ? VB_W - ZONE_M - w : ZONE_M);
+    var g = el('g', { 'class': 'zone zone--' + (z.side || 'left'), 'data-name': z.name, tabindex: 0, role: 'button' });
+    g.setAttribute('aria-label', T('a11yZone', { name: T(z.name) }));
+    var shadow = el('rect', { 'class': 'zone__shadow', x: x, y: y + 8, width: w, height: hh, rx: 28 });
+    var body = el('rect', { 'class': 'zone__body', x: x, y: y, width: w, height: hh, rx: 28 });
+    var band = el('rect', { 'class': 'zone__band', x: x + 16, y: y + 16, width: w - 32, height: 58, rx: 18 });
+    var label = el('text', { 'class': 'figure-label zone__label', x: x + w / 2, y: y + 46, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+    label.textContent = T(z.name);
+    var shelf = { x: x + 14, y: y + 88, w: w - 28, h: hh - 102 };
+    var tray = el('rect', { 'class': 'zone__shelf', x: shelf.x, y: shelf.y, width: shelf.w, height: shelf.h, rx: 18 });
+    [shadow, body, band, label, tray].forEach(function (n) { g.appendChild(n); });
     group.appendChild(g);
-    return { name: b.name, g: g, body: body, label: label, centre: { x: x + w / 2, y: y + hh * 0.55 }, w: w, h: hh, x: x, y: y };
+    var cap = Math.max(1, z.cap || 3), cols = Math.min(2, cap), rows = Math.ceil(cap / cols);
+    var zone = {
+      name: z.name, side: z.side || 'left', g: g, body: body, label: label, shelf: shelf, kept: [],
+      centre: { x: x + w / 2, y: y + hh / 2 }, x: x, y: y, w: w, h: hh,
+      /* where the i-th card kept here sits, and how small it is: a grid of
+         two columns, a short last row centred */
+      seat: function (i) {
+        var cw = shelf.w / cols, rh = shelf.h / rows;
+        var row = Math.floor(i / cols), col = i % cols;
+        var inRow = row === rows - 1 ? cap - row * cols : cols;
+        return { x: shelf.x + shelf.w / 2 + (col - (inRow - 1) / 2) * cw,
+                 y: shelf.y + rh * (row + 0.5),
+                 k: Math.min(Math.min(cw, rh) * 0.8 / 180, 0.5) };
+      }
+    };
+    return zone;
+  }
+
+  /* ---- the holder a shape is sorted on --------------------------------------
+     An invisible grab area centred on (cx, cy); the shape is built into
+     card.g after it, so the whole shape moves as one when swiped. */
+  var CARD_W = 270, CARD_H = 250;
+  function buildCard(group, cx, cy) {
+    var w = CARD_W, hh = CARD_H, x = cx - w / 2, y = cy - hh / 2;
+    var g = el('g', { 'class': 'swipe-card', tabindex: 0, role: 'button' });
+    g.setAttribute('aria-label', T('a11yCard'));
+    /* no visible card: only an invisible grab area round the shape (it
+       shows a soft outline only under keyboard focus) */
+    var face = el('g', { 'class': 'swipe-card__face' });
+    face.appendChild(el('rect', { 'class': 'swipe-card__hit', x: x, y: y, width: w, height: hh, rx: 30 }));
+    g.appendChild(face);
+    group.appendChild(g);
+    M.set(g, { svgOrigin: cx + ' ' + cy });
+    return { g: g, face: face, centre: { x: cx, y: cy }, w: w, h: hh };
   }
 
   /* ---- the names in the tray, the answers ------------------------------- */
@@ -151,13 +188,11 @@
   function resetFigure() {
     sections.forEach(function (s) { if (s.reset) s.reset(); });
     dom.burst.textContent = '';
-    dom.counter.setAttribute('hidden', '');
-    dom.counter.textContent = '';
     Array.prototype.forEach.call(dom.figure.querySelectorAll('.is-lit, .is-pulsing, .is-dim'), function (e) {
       e.classList.remove('is-lit', 'is-pulsing', 'is-dim');
       e.style.removeProperty('--pulse-times');
     });
-    clearInline([dom.figure, dom.counter].concat(Array.prototype.slice.call(dom.figure.querySelectorAll('*'))));
+    clearInline([dom.figure].concat(Array.prototype.slice.call(dom.figure.querySelectorAll('*'))));
   }
   function resetFooter() {
     dom.tray.setAttribute('hidden', ''); dom.tray.textContent = ''; chips = [];
@@ -169,16 +204,6 @@
   }
   function quiet(p) { if (p && p.catch) p.catch(function () {}); return p; }
 
-  /* The "n of m" counter in the board's corner. */
-  function counter(n, m) {
-    dom.counter.textContent = T('nOfM', { n: n, m: m });
-    if (dom.counter.hasAttribute('hidden')) return Flow.anim(Beats.counterIn(dom.counter));
-    return Flow.anim(Beats.emphasise(dom.counter));
-  }
-  function counterOff() {
-    if (dom.counter.hasAttribute('hidden')) return Promise.resolve();
-    return Flow.anim(Beats.counterOut(dom.counter));
-  }
 
   /* ---- Next --------------------------------------------------------------- */
   function handOver(btn) {
@@ -293,10 +318,23 @@
     if (begun.text === text && performance.now() - begun.at < 100) return Promise.resolve(begun.at);
     return new Promise(function (resolve) { awaiting.push({ text: text, resolve: resolve }); });
   }
-  /* fn, run as `phrase` is heard (or typed) in the line `text`. */
+  /* fn, run as `phrase` is heard (or typed) in the line `text`. A line of
+     several sentences is shown a sentence at a time, so the phrase is
+     timed from the start of ITS sentence. */
   function onWord(text, phrase, fn) {
-    return lineBegins(text)
-      .then(function (t0) { return Flow.wait(t0 + wordAt(text, phrase) - performance.now()); })
+    var parts = sentencesOf(text), from = text;
+    if (parts) {
+      parts.some(function (s) {
+        if (plain(s).indexOf(plain(phrase)) < 0) return false;
+        from = s.trim();
+        return true;
+      });
+    }
+    return lineBegins(from)
+      .then(function (t0) {
+        var into = from === text ? wordAt(text, phrase) : Math.max(0, wordAt(text, phrase) - wordAt(text, from));
+        return Flow.wait(t0 + into - performance.now());
+      })
       .then(fn);
   }
   /* The same by key: armed BEFORE the line is said. */
@@ -405,47 +443,80 @@
       return Promise.all([reveal(), heard, along ? along(line) : null]);
     });
   }
-  /* Say a line from wherever the bird is: on the header already, or up to it. */
-  function say(key, mood, along) {
-    var line = typeof key === 'string' ? keyed(key) : key;
+  /* ONE sentence on screen at a time, everywhere: every line the bird says
+     comes through say(), and a line of several sentences is shown a
+     sentence at a time -- each one replacing the one before. */
+
+  /* One sentence (or a line of one), from wherever the bird is: on the
+     header already, or up to it. */
+  function sayOne(line, mood, along) {
     return birdOnHeader() ? speak(line, mood, along) : arriveSaying(line, mood, along);
+  }
+  /* Say a line: a key, or a { text, vo } line. */
+  function say(key, mood, along) {
+    var line = typeof key === 'string' ? keyed(key) : lineOf(key);
+    var parts = sentencesOf(line.text);
+    if (!parts) return sayOne(line, mood, along);
+    parts = parts.map(function (s) { return s.trim(); });
+    /* Skipped over: only where the line ENDS is left on the board, its last
+       sentence. The beats armed on its words (onPhrase) are let go all the
+       same, so nothing they bring in is lost to the skip. */
+    if (Flow.isFast()) {
+      began(line.text);
+      parts.forEach(function (s) { began(s); });
+      return sayOne({ text: parts[parts.length - 1], vo: null }, mood, along);
+    }
+    return bySentence(line, parts, mood, along);
+  }
+  /* The same by key, with its {placeholders} filled. */
+  function speakBySentence(key, mood, repl) {
+    return say(keyed(key, repl), mood);
+  }
+  /* A line given as text or { text, vo }, never as a key. */
+  function speakLine(text, mood, along) {
+    return say(lineOf(text), mood, along);
   }
   function keyed(key, repl) {
     return { text: global.I18n ? global.I18n.t(key, repl) : key, vo: key };
   }
 
-  /* A line of more than one sentence, said a sentence at a time. */
+  /* A sentence ends at . ! or ? followed by a space or the end of the line
+     (so a "4.5" is never cut in two). */
   var OUT_LEAD = 280;
   function sentencesOf(text) {
-    var parts = text.match(/[^.!?]+[.!?]+\s*/g);
-    return parts && parts.length > 1 && parts.join('') === text ? parts : null;
+    var parts = String(text).match(/[\s\S]*?[.!?]+(?=\s|$)\s*/g);
+    return parts && parts.length > 1 && parts.join('') === String(text) ? parts : null;
   }
-  function speakBySentence(key, mood, repl) {
-    var line = keyed(key, repl);
-    var I = global.I18n;
-    var parts = sentencesOf(line.text);
-    if (!parts || Flow.isFast()) return say(line, mood);
-    var cues = I && I.cues ? I.cues(key) : null;
+  function bySentence(line, parts, mood, along) {
+    var acting = along ? quiet(along(line)) : null;
+    var cues = cuesFor(line.text, line.vo);
+
+    /* No word timings: each sentence typed in turn, replacing the last. A
+       recording (if there is one) plays the whole line underneath. */
     if (!cues) {
-      if (I && I.voiced && I.voiced().indexOf(key) >= 0) return say(line, mood);
-      return parts.reduce(function (chain, s, i) {
-        return chain.then(function (n) {
-          if (i > 0 && n !== speaking) return n;
-          /* the whole line begins with its first sentence, so a beat armed
-             on a phrase of the line (onPhrase) is counted from here */
+      var heard = null;
+      var chain = parts.reduce(function (c, s, i) {
+        return c.then(function (n) {
+          if (i > 0 && n !== speaking) return n;        /* talked over: stop */
+          /* the whole line begins with its first sentence */
           if (i === 0) began(line.text);
-          var said = i === 0 ? say(s.trim(), mood) : speak(s.trim(), mood);
+          var said = sayOne({ text: s, vo: null }, mood);
+          if (i === 0) heard = quiet(voiceOf(line));
           var mine = speaking;
           return said.then(function () { return mine; });
         });
       }, Promise.resolve(speaking));
+      return Promise.all([chain.then(function () { return heard; }), acting]);
     }
+
+    /* On the recording's clock: each sentence comes in as its first word is
+       heard, the one before going out just ahead of it. */
     var w = 0;
     var split = parts.map(function (s) {
       var n = (s.match(/\S+\s*/g) || []).length;
       var at2 = cues.slice(w, w + n);
       w += n;
-      return { text: s.trim(), at: at2 };
+      return { text: s, at: at2 };
     });
     var up = birdOnHeader() ? Promise.resolve() : mascotJumpIn();
     return up.then(function () {
@@ -457,7 +528,8 @@
         M.set(dom.promptLine, { clearProps: 'opacity,transform,filter' });
         mascot.state(mood || 'talking');
         var t0 = performance.now();
-        var heard = quiet(voiceOf(line));
+        began(line.text);
+        var heard2 = quiet(voiceOf(line));
         var typed = split.reduce(function (chain, s, i) {
           return chain.then(function () {
             if (mine !== speaking) return;
@@ -474,7 +546,7 @@
             });
           });
         }, Promise.resolve());
-        return Promise.all([typed, heard]);
+        return Promise.all([typed, heard2, acting]);
       }).then(function () { if (mine === speaking) mascot.settle(); });
     });
   }
@@ -583,7 +655,6 @@
     var footer = [];
     if (!dom.tray.hasAttribute('hidden')) footer.push(Flow.anim(Beats.trayOut(dom.tray, chips)));
     if (!dom.choices.hasAttribute('hidden')) footer.push(Flow.anim(Beats.trayOut(dom.choices, choiceBtns)));
-    footer.push(counterOff());
     var extra = sections.reduce(function (all, s) { return s.wipe ? all.concat(s.wipe()) : all; }, []);
     return Promise.all([gone, shut, line, figure].concat(footer, extra)).then(function () {
       clearPrompt();
@@ -802,120 +873,137 @@
       function (err) { off(); throw err; });
   }
 
-  /* ---- a shape into a bucket -----------------------------------------------
-     One SVG shape group dragged into one of the buckets. Right: it drops
-     in and resolves { right }. Wrong: it shakes and goes home, o.onWrong is
-     told, and the learner tries again. Keyboard: Enter on the shape picks
-     it up, Enter on a bucket drops it. */
-  function armSort(shape, buckets, answer, o) {
+  /* ---- a card swiped left or right ----------------------------------------
+     The card follows the finger sideways only, tilting as it goes. Past
+     SWIPE_AT (figure units) the panel on that side leans in to say "here";
+     let go there -- or flick it that way -- and the card is sorted. Let go
+     short of it and it springs home. Right: it flies into its panel and is
+     kept there, small, and the promise resolves { right }. Wrong: the panel
+     shakes, the card springs home with a head-shake, o.onWrong is told and
+     the learner tries again. A tap on the card wiggles it (the hint that it
+     moves sideways); a tap on a panel sorts it there; the arrow keys on the
+     card and Enter on a panel do the same from the keyboard. */
+  var SWIPE_AT = 80, FLICK_V = 0.55, FLICK_MIN = 28, TILT = 9;
+  function armSwipe(card, zones, answer, o) {
     o = o || {};
-    var g = shape.g, failed = false, live = true, drag = null, picked = false;
-    g.classList.add('is-draggable', 'is-live');
-    shape.hitbox.setAttribute('tabindex', '0');
-    shape.hitbox.setAttribute('role', 'button');
-    shape.hitbox.setAttribute('aria-label', T('a11yShape'));
+    var g = card.g, failed = false, live = true, busy = false, drag = null, lean = null, lastDrag = 0;
+    var left = zones.filter(function (z) { return z.side === 'left'; })[0];
+    var right = zones.filter(function (z) { return z.side === 'right'; })[0];
+    g.classList.add('is-live');
+
     function k() { var m = dom.figure.getScreenCTM(); return m ? m.a : 1; }
-    function bucketAt(x, y) {
-      for (var i = 0; i < buckets.length; i++) {
-        var r = buckets[i].body.getBoundingClientRect();
-        if (x >= r.left - 20 && x <= r.right + 20 && y >= r.top - 30 && y <= r.bottom + 20) return buckets[i];
-      }
-      return null;
+    function zoneFor(dx) { return dx <= -SWIPE_AT ? left : dx >= SWIPE_AT ? right : null; }
+    function tiltOf(dx) { return Math.max(-1, Math.min(1, dx / (SWIPE_AT * 2.2))) * TILT; }
+    function leanTo(z) {
+      if (z === lean) return;
+      if (lean) { lean.g.classList.remove('is-over'); Beats.zoneLean(lean, false); }
+      lean = z;
+      if (z) { z.g.classList.add('is-over'); Beats.zoneLean(z, true); }
     }
-    function hover(b) { buckets.forEach(function (x) { x.g.classList.toggle('is-over', x === b); }); }
-    function attempt(b) {
-      hover(null);
-      if (!b) return Flow.anim(Beats.shapeHome(g));
-      if (b.name === answer) return right(b);
-      return wrong(b);
+    function attempt(z) {
+      leanTo(null);
+      if (!z) return Flow.anim(Beats.swipeHome(card));
+      if (z.name === answer) return sorted(z);
+      return refused(z);
     }
-    function right(b) {
-      live = false;
-      g.classList.remove('is-lifted', 'is-picked');
-      var c = shape.centre();
-      var x = gsap.getProperty(g, 'x') || 0, y = gsap.getProperty(g, 'y') || 0;
-      Beats.bucketRight(b);
-      Flow.anim(Beats.shapeInto(g, b.centre.x - (c.x + x), b.centre.y - (c.y + y), c.x + 'px ' + c.y + 'px'))
+    function sorted(z) {
+      live = false; busy = true;
+      g.classList.remove('is-live', 'is-lifted');
+      var seat = z.seat(z.kept.length);
+      z.kept.push(card);
+      Beats.zoneRight(z);
+      Flow.anim(Beats.swipeInto(card, seat.x - card.centre.x, seat.y - card.centre.y, seat.k))
         .then(function () { dom.gate.dispatchEvent(new MouseEvent('click')); }, function () {});
     }
-    function wrong(b) {
-      failed = true;
-      g.classList.remove('is-picked');
-      picked = false;
-      if (o.onWrong) o.onWrong(b);
-      Beats.bucketWrong(b);
-      Flow.anim(Beats.shapeWrong(g)).then(function () { return Flow.anim(Beats.shapeHome(g)); }, function () {});
+    function refused(z) {
+      failed = true; busy = true;
+      if (o.onWrong) o.onWrong(z);
+      Beats.zoneWrong(z);
+      Flow.anim(Beats.swipeWrong(card)).then(function () { busy = false; }, function () { busy = false; });
     }
+
     function onDown(ev) {
-      if (!live || drag) return;
+      if (!live || busy || drag) return;
       ev.preventDefault();
-      drag = { id: ev.pointerId, ox: ev.clientX, oy: ev.clientY, moved: false,
-               x0: gsap.getProperty(g, 'x') || 0, y0: gsap.getProperty(g, 'y') || 0 };
-      try { shape.hitbox.setPointerCapture(ev.pointerId); } catch (e) {}
+      var x0 = gsap.getProperty(g, 'x') || 0;
+      drag = { id: ev.pointerId, ox: ev.clientX, x0: x0, dx: x0, moved: false, t: performance.now(), v: 0 };
+      try { g.setPointerCapture(ev.pointerId); } catch (e) {}
       g.classList.add('is-lifted');
-      var c = shape.centre();
-      M.to(g, { scale: 1.06, transformOrigin: c.x + 'px ' + c.y + 'px', duration: M.dur(0.12), ease: 'power2.out', overwrite: 'auto' });
+      gsap.killTweensOf(g);
+      M.to(g, { scale: 1.04, duration: M.dur(0.12), ease: 'power2.out', overwrite: 'auto' });
       if (o.onTouch) o.onTouch();
     }
     function onMove(ev) {
       if (!drag || ev.pointerId !== drag.id) return;
-      var dx = ev.clientX - drag.ox, dy = ev.clientY - drag.oy;
-      if (!drag.moved && Math.abs(dx) + Math.abs(dy) > TAP_SLOP) drag.moved = true;
+      var dx = drag.x0 + (ev.clientX - drag.ox) / k();
+      if (!drag.moved && Math.abs(ev.clientX - drag.ox) > TAP_SLOP) drag.moved = true;
       if (!drag.moved) return;
-      M.set(g, { x: drag.x0 + dx / k(), y: drag.y0 + dy / k() });
-      hover(bucketAt(ev.clientX, ev.clientY));
+      var now = performance.now(), dt = Math.max(1, now - drag.t);
+      drag.v = drag.v * 0.6 + ((dx - drag.dx) / dt) * 0.4;   /* figure units per ms, smoothed */
+      drag.dx = dx; drag.t = now;
+      M.set(g, { x: dx, y: -Math.min(14, Math.abs(dx) * 0.05), rotation: tiltOf(dx) });
+      leanTo(zoneFor(dx));
     }
     function onUp(ev) {
       if (!drag || ev.pointerId !== drag.id) return;
       var d = drag; drag = null;
       g.classList.remove('is-lifted');
-      if (!d.moved) {
-        picked = !picked;
-        g.classList.toggle('is-picked', picked);
-        if (!picked) Beats.shapeHome(g);
-        return;
-      }
-      attempt(bucketAt(ev.clientX, ev.clientY));
+      if (!d.moved) { Flow.anim(Beats.swipeNudge(card)); return; }
+      lastDrag = performance.now();
+      var z = zoneFor(d.dx);
+      if (!z && Math.abs(d.dx) >= FLICK_MIN && Math.abs(d.v) >= FLICK_V) z = d.v < 0 ? left : right;
+      attempt(z);
     }
-    function onCancel(ev) { if (drag && ev.pointerId === drag.id) { drag = null; hover(null); Beats.shapeHome(g); } }
-    function onShapeKey(ev) {
-      if (!live || (ev.key !== 'Enter' && ev.key !== ' ')) return;
-      ev.preventDefault();
-      picked = !picked;
-      g.classList.toggle('is-picked', picked);
+    function onCancel(ev) {
+      if (!drag || ev.pointerId !== drag.id) return;
+      drag = null;
+      g.classList.remove('is-lifted');
+      leanTo(null);
+      Flow.anim(Beats.swipeHome(card));
     }
-    function bucketOf(ev) { for (var i = 0; i < buckets.length; i++) if (buckets[i].g === ev.currentTarget) return buckets[i]; return null; }
-    function onBucketUp(ev) { if (live && !drag && picked) attempt(bucketOf(ev)); }
-    function onBucketKey(ev) {
-      if (!live || !picked || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+    function onCardKey(ev) {
+      if (!live || busy) return;
+      if (ev.key === 'ArrowLeft') { ev.preventDefault(); attempt(left); }
+      else if (ev.key === 'ArrowRight') { ev.preventDefault(); attempt(right); }
+    }
+    function zoneOf(ev) { for (var i = 0; i < zones.length; i++) if (zones[i].g === ev.currentTarget) return zones[i]; return null; }
+    function onZoneClick(ev) {
+      if (!live || busy || drag || performance.now() - lastDrag < 300) return;
+      if (o.onTouch) o.onTouch();
+      attempt(zoneOf(ev));
+    }
+    function onZoneKey(ev) {
+      if (!live || busy || (ev.key !== 'Enter' && ev.key !== ' ')) return;
       ev.preventDefault();
-      attempt(bucketOf(ev));
+      attempt(zoneOf(ev));
     }
     function off() {
       live = false;
-      shape.hitbox.removeEventListener('pointerdown', onDown);
-      shape.hitbox.removeEventListener('keydown', onShapeKey);
+      g.removeEventListener('pointerdown', onDown);
+      g.removeEventListener('keydown', onCardKey);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       document.removeEventListener('pointercancel', onCancel);
-      buckets.forEach(function (b) { b.g.removeEventListener('pointerup', onBucketUp); b.g.removeEventListener('keydown', onBucketKey); });
-      g.classList.remove('is-draggable', 'is-live', 'is-lifted', 'is-picked');
-      hover(null);
+      zones.forEach(function (z) { z.g.removeEventListener('click', onZoneClick); z.g.removeEventListener('keydown', onZoneKey); });
+      g.classList.remove('is-live', 'is-lifted');
+      leanTo(null);
     }
-    shape.hitbox.addEventListener('pointerdown', onDown);
-    shape.hitbox.addEventListener('keydown', onShapeKey);
+    g.addEventListener('pointerdown', onDown);
+    g.addEventListener('keydown', onCardKey);
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
     document.addEventListener('pointercancel', onCancel);
-    buckets.forEach(function (b) { b.g.addEventListener('pointerup', onBucketUp); b.g.addEventListener('keydown', onBucketKey); });
+    zones.forEach(function (z) { z.g.addEventListener('click', onZoneClick); z.g.addEventListener('keydown', onZoneKey); });
 
     return Flow.once(dom.gate, { auto: true }).then(
       function () {
-        if (live) {                       /* a skip answered it */
-          var b = buckets.filter(function (x) { return x.name === answer; })[0];
+        if (live) {                       /* a skip answered it: straight onto its shelf */
+          var z = zones.filter(function (x) { return x.name === answer; })[0];
+          var seat = z.seat(z.kept.length);
+          z.kept.push(card);
           live = false;
-          Beats.bucketRight(b);
-          M.set(g, { opacity: 0 });
+          M.set(card.face, { opacity: 0 });
+          M.set(g, { x: seat.x - card.centre.x, y: seat.y - card.centre.y, rotation: 0, scale: seat.k });
         }
         off();
         return { right: !failed };
@@ -1156,22 +1244,21 @@
     dom: function () { return dom; },
     mascot: function () { return mascot; },
     el: el, round2: round2,
-    buildBox: buildBox, emptyBox: emptyBox, buildBucket: buildBucket,
+    buildBox: buildBox, emptyBox: emptyBox, buildZone: buildZone, buildCard: buildCard,
     buildChips: buildChips, buildChoices: buildChoices, shuffle: shuffle,
     chips: function (list) { if (list) chips = list; return chips; },
     choices: function (list) { if (list) choiceBtns = list; return choiceBtns; },
     offerChoices: offerChoices, clearChoices: clearChoices,
     handOver: handOver, autoTurn: autoTurn,
     openBoard: openBoard, wipeBoard: wipeBoard, collapseHeader: collapseHeader, openHeader: openHeader,
-    say: say, speak: speak, arriveSaying: arriveSaying, speakBySentence: speakBySentence,
+    say: say, speak: speakLine, arriveSaying: speakLine, speakBySentence: speakBySentence,
     keyed: keyed, hear: hear, voiceOver: voiceOver, birdVoice: birdVoice, typedFor: typedFor,
     onWord: onWord, onPhrase: onPhrase,
     birdAway: birdAway, lineAway: lineAway, clearPrompt: clearPrompt, birdOnHeader: birdOnHeader,
     mascotJumpIn: mascotJumpIn, mascotJumpOut: mascotJumpOut,
     celebrate: celebrate, praise: praise, burstAt: burstAt,
-    counter: counter, counterOff: counterOff,
     askChoice: askChoice, askUntilRight: askUntilRight,
-    armQuiz: armQuiz, armSort: armSort, armTapSides: armTapSides,
+    armQuiz: armQuiz, armSwipe: armSwipe, armTapSides: armTapSides,
     dragGuide: function (to) { return W.dragGuide(dom.tray, to); },
     ripple: ripple, quiet: quiet, clearInline: clearInline
   };

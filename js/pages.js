@@ -431,6 +431,9 @@
       return parts.reduce(function (chain, s, i) {
         return chain.then(function (n) {
           if (i > 0 && n !== speaking) return n;
+          /* the whole line begins with its first sentence, so a beat armed
+             on a phrase of the line (onPhrase) is counted from here */
+          if (i === 0) began(line.text);
           var said = i === 0 ? say(s.trim(), mood) : speak(s.trim(), mood);
           var mine = speaking;
           return said.then(function () { return mine; });
@@ -633,8 +636,10 @@
         }
         var shook = Flow.anim(Beats.choiceWrong(btn));
         btn.classList.add('is-struck');
-        var told = o.onWrong ? o.onWrong(buttons.indexOf(btn)) : Promise.resolve();
-        return Promise.all([shook, told]).then(function () { return Flow.wait(SHORT); }).then(round);
+        /* The reason is said while the question stays open: a learner who
+           already sees their mistake can tap again at once. */
+        if (o.onWrong) quiet(o.onWrong(buttons.indexOf(btn)));
+        return shook.then(function () { return Flow.wait(SHORT); }).then(round);
       });
     }
     return round();

@@ -111,6 +111,9 @@
   --font-body: "Baloo 2", system-ui, sans-serif;
 
   --art-page: url("../assets/images/bg.jpg");
+  /* The welcome's painting (title and bird drawn in). Its own snowflakes are
+     painted out of welcome-screen.png; js/scenery.js lets them fall instead. */
+  --art-welcome: url("../assets/images/welcome-bg.jpg");
 
   /* ---- stacking ---------------------------------------------------------- */
   --z-snow: 0;
@@ -198,11 +201,11 @@ body {
   border: 3px solid var(--board-rim);
   background:
     linear-gradient(180deg,
-      color-mix(in srgb, var(--snow) 86%, transparent) 0%,
-      color-mix(in srgb, var(--ice-1) 84%, transparent) 55%,
-      color-mix(in srgb, var(--ice-2) 80%, transparent) 100%);
-  -webkit-backdrop-filter: blur(16px) saturate(1.15);
-  backdrop-filter: blur(16px) saturate(1.15);
+      color-mix(in srgb, var(--snow) 74%, transparent) 0%,
+      color-mix(in srgb, var(--ice-1) 70%, transparent) 55%,
+      color-mix(in srgb, var(--ice-2) 66%, transparent) 100%);
+  -webkit-backdrop-filter: blur(7px) saturate(1.1);
+  backdrop-filter: blur(7px) saturate(1.1);
   box-shadow:
     inset 0 2px 0 var(--snow),
     inset 0 0 0 1px color-mix(in srgb, var(--ice-3) 45%, transparent),
@@ -237,20 +240,6 @@ body {
   stroke-linejoin: round;
 }
 
-/* The snow cap lying along the top edge of the slab, and the two small
-   drifts at the bottom corners. Decoration only. */
-.board__cap {
-  position: absolute;
-  left: -3px;
-  right: -3px;
-  top: -3px;
-  height: clamp(14px, 3.2vh, 28px);
-  pointer-events: none;
-  overflow: visible;
-}
-.board__cap svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.board__cap path { fill: var(--snow); }
-.board__cap .cap__shade { fill: color-mix(in srgb, var(--ice-2) 60%, var(--snow)); }
 
 .board__top {
   position: relative;
@@ -460,7 +449,7 @@ body {
   z-index: var(--z-next);
   display: grid;
   place-items: center;
-  width: clamp(56px, 9.2vh, 94px);
+  width: clamp(72px, 13vh, 132px);
   aspect-ratio: 1;
   padding: 0;
   border: 0;
@@ -605,60 +594,51 @@ body {
   grid-template-rows: 1fr auto;
   justify-items: center;
   padding: 0 clamp(16px, 5vw, 80px) clamp(28px, 12vh, 140px);
+  overflow: hidden;
   background:
-    var(--art-page) center / cover no-repeat,
+    var(--art-welcome) center / cover no-repeat,
     linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-deep) 100%);
 }
 .welcome[hidden] { display: none; }
 
-/* The title, lettered in frost: white to ice, a deep-blue edge, a soft
-   glow -- and a snow cap on it, drawn by the SVG under it. */
+/* The title is painted into the welcome art, so the lettering here is kept
+   for screen readers only (and still faded out by welcomeOut). */
 .welcome__title {
-  grid-row: 1;
-  align-self: center;
-  margin: 0;
-  padding-top: 2vh;
-  text-align: center;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(40px, 9.4vh, 108px);
-  line-height: 1.02;
-  letter-spacing: 1px;
-  color: var(--snow);
-  -webkit-text-stroke: 0;
-  text-shadow:
-    0 2px 0 var(--ice-2),
-    0 4px 0 var(--ice-3),
-    0 6px 0 var(--ice-deep),
-    0 9px 0 var(--ice-ink),
-    0 14px 24px color-mix(in srgb, var(--ink) 45%, transparent),
-    0 0 32px color-mix(in srgb, var(--snow) 60%, transparent);
-  transform-origin: 50% 60%;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
-.welcome__title .t2 {
-  display: block;
-  color: var(--gold);
-  text-shadow:
-    0 2px 0 color-mix(in srgb, var(--gold) 60%, var(--snow)),
-    0 4px 0 var(--gold-deep),
-    0 6px 0 var(--orange-deep),
-    0 9px 0 color-mix(in srgb, var(--orange-deep) 70%, var(--ink)),
-    0 14px 24px color-mix(in srgb, var(--ink) 45%, transparent);
-}
-/* A ring of snowflakes drifting slowly round the title. */
+
+/* The painting's snowflakes, alive: they fall slowly from the sky. The box
+   is sized and placed by js/scenery.js to sit exactly over the cover-fitted
+   art, so a flake's first spot is where it was painted. */
 .welcome__flakes {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  overflow: hidden;
 }
-.welcome__flakes svg {
+.wflake {
   position: absolute;
-  width: clamp(26px, 5vh, 60px);
-  height: auto;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
   color: var(--snow);
-  opacity: .85;
-  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--ice-ink) 40%, transparent));
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--ice-ink) 35%, transparent));
+}
+.wflake--speck {
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, var(--snow) 0%, color-mix(in srgb, var(--snow) 70%, transparent) 55%, transparent 72%);
+  filter: none;
 }
 
 /* ---- the loading line, where Start will stand ---------------------------- */

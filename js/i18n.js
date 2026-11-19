@@ -1,13 +1,7 @@
-/* i18n.js -- every word and clip by KEY, from one locale per skill:
- *   locales s1/locales.json   skill 1  (clips in assets/VO-skill 1)
- *   locales s2/locales.json   skill 2  (clips in assets/VO-skill 2)
- *   locales s3/locales.json   skill 3  (clips in assets/VO-skill 3)
- *   locales s4/locales.json   skill 4  (clips in assets/VO-skill 4)
- * All four are read and merged into one, so any skill may use any key; a
- * key lives in exactly one file (a voiced key beside its clip's folder,
- * a word shared by several skills in the first skill that uses it).
+/* i18n.js -- every word and clip by KEY, from one locale:
+ *   locales/locales.json   (clips in assets/VO/en)
  *   T('p01Hey')                    -> "Hey there!"
- *   T('p04HeightIs', { h: 'h₁' })  -> "And its height is h₁."
+ *   T('s2SinIs', { v: '1⁄√2' })    -> "sin 45° = 1⁄√2"
  *   T('p20Work.0')                 -> first item of an array key
  *   I18n.voice('p01Hey')           -> "assets/VO/en/p01Hey.webm?v=1"
  *   I18n.say('p01Hey')             -> plays it (js/audio.js); resolves true/false
@@ -16,33 +10,28 @@
  *                                     is heard, from the clip's start
  *   I18n.applyStatic()             -> fills data-i18n / data-i18n-html /
  *                                     data-i18n-attr="title:key" in HTML
- * Language: ?lan=xx on the URL, else defaultLanguage. A language without
- * recordings speaks the default language's clips. English only for now.
- * Served over http the JSON is fetched; from file:// it reads each
- * folder's locales.js instead. Regenerate it after editing that JSON (N = 1-4):
- *   (printf 'window.GAME_LOCALES_SN='; cat "locales sN/locales.json"; echo ';') > "locales sN/locales.js"
+ * Language: ?lan=xx on the URL, else defaultLanguage (en, hi, mr, te, gu,
+ * od). A language without recordings speaks the default language's clips,
+ * untimed: its words are its own, so those clips' cues are not borrowed.
+ * Served over http the JSON is fetched; from file:// it reads
+ * locales/locales.js instead. Regenerate it after editing the JSON:
+ *   (printf 'window.GAME_LOCALES='; cat locales/locales.json; echo ';') > locales/locales.js
  */
 var I18n = (function () {
   'use strict';
 
   var PARAM     = 'lan';  /* ?lan=hi */
   var PARAM_ALT = 'lang'; /* ...and ?lang=hi */
-  /* one locale per skill, merged in this order; each .js copy (the
-     generated fallback for file://) sets its own global. A skill on its
-     own (window.GAME_SKILL, see pages.js) reads the one file of its own
-     locales/ folder instead, whose .js copy sets window.GAME_LOCALES:
-       (printf 'window.GAME_LOCALES='; cat locales/locales.json; echo ';') > locales/locales.js */
-  var PARTS = window.GAME_SKILL
-    ? [{ json: 'locales/locales.json', js: 'locales/locales.js', global: 'GAME_LOCALES' }]
-    : [1, 2, 3, 4].map(function (n) {
-        var dir = 'locales%20s' + n + '/';
-        return { json: dir + 'locales.json', js: dir + 'locales.js', global: 'GAME_LOCALES_S' + n };
-      });
+  /* one locale for the whole game; the .js copy (the generated fallback
+     for file://) sets its own global */
+  var PARTS = [
+    { json: 'locales/locales.json', js: 'locales/locales.js', global: 'GAME_LOCALES' }
+  ];
   var CLIP_EXT  = '.webm';                    /* Opus in WebM, see media rules */
   /* the file's own codes, and what <html lang> should say where they differ */
   var BCP47 = { od: 'or' };
   /* keys of the file that are not languages */
-  var META = { defaultLanguage: 1, languageLabels: 1, voiceOver: 1 };
+  var META = { defaultLanguage: 1, languageLabels: 1, supportedLanguages: 1, voiceOver: 1 };
 
   var _data = null;
   var _lang = 'en';
@@ -89,8 +78,8 @@ var I18n = (function () {
   function _warn(msg) {
     if (typeof console !== 'undefined' && console.warn) console.warn('[i18n] ' + msg);
   }
-  /* one skill's locale: the JSON over http, its .js copy from file:// or
-     when the JSON cannot be read */
+  /* the locale: the JSON over http, its .js copy from file:// or when the
+     JSON cannot be read */
   function _readPart(part, local, cb) {
     var fromScript = function () {
       _readScript(part, function (js) {
@@ -101,9 +90,9 @@ var I18n = (function () {
     if (local) return fromScript();          /* file:// cannot fetch the JSON */
     _readJson(part.json, function (json) { return json ? cb(json) : fromScript(); });
   }
-  /* The skills' locales as one: every language's lines, every language's
+  /* The locales as one: every language's lines, every language's
      recordings. A clip is kept as its full url, built with its own file's
-     dir and rev, so each skill's recordings stay where its file says. */
+     dir and rev. */
   function _merge(parts) {
     var out = { voiceOver: {} };
     parts.forEach(function (data, i) {
@@ -111,6 +100,7 @@ var I18n = (function () {
       Object.keys(data).forEach(function (code) {
         var val = data[code];
         if (code === 'defaultLanguage') { if (!out.defaultLanguage) out.defaultLanguage = val; return; }
+        if (code === 'supportedLanguages') { if (!out.supportedLanguages) out.supportedLanguages = val; return; }
         if (code === 'languageLabels') {
           out.languageLabels = out.languageLabels || {};
           Object.keys(val || {}).forEach(function (l) {
@@ -150,8 +140,8 @@ var I18n = (function () {
     try { document.documentElement.lang = BCP47[_lang] || _lang; } catch (e) {}
     if (cb) cb(_lang);
   }
-  /* Load the four locales and call back with the language code. The game
-     goes on showing keys if nothing can be read -- never a blocked screen. */
+  /* Load the locale and call back with the language code. The game goes
+     on showing keys if nothing can be read -- never a blocked screen. */
   function load(cb) {
     var local = false;
     try { local = window.location.protocol === 'file:'; } catch (e) {}
@@ -196,6 +186,12 @@ var I18n = (function () {
     return _sub(val, repl);
   }
   function has(key) { return _raw(key) !== undefined; }
+  /* tDefault(key): the line in the default language -- the one the game
+     was written in, whose words its timing is keyed to (pages.js onPhrase) */
+  function tDefault(key) {
+    var def = (_data && _data[_default()]) || {};
+    return typeof def[key] === 'string' ? def[key] : String(key);
+  }
   /* "16 {unitCm}" -> "16 cm": every {key} in the template is a lookup */
   function fmt(template) {
     return String(template).replace(/\{(\w+)\}/g, function (m, k) { return has(k) ? t(k) : m; });
@@ -269,15 +265,16 @@ var I18n = (function () {
      was recorded, and a word-for-word match can no longer be trusted.
      cues(key, text) counts the words of `text` instead of the key's. */
   function cues(key, text) {
-    var p = _pack();
+    /* the language's OWN recordings only: a language speaking the default
+       language's clips has words of its own, which those cues do not time */
+    var vo = (_data && _data.voiceOver) || {};
+    var p = vo[_lang];
     var list = p && p.cues && p.cues[key];
     if (!Array.isArray(list)) return null;
-    /* `text`: the line as it is shown, for a line with a placeholder
-       ("Circumference = {f}.") whose words are only known once filled */
     var words = String(text != null ? text : t(key)).match(/\S+\s*/g) || [];
     return words.length === list.length ? list.slice() : null;
   }
-  /* every clip the merged locales name, for the loader to fetch */
+  /* every clip the locale names, for the loader to fetch */
   function clips() {
     var p = _pack();
     return p && p.urls ? Object.keys(p.urls).map(function (k) { return p.urls[k]; }) : [];
@@ -290,14 +287,15 @@ var I18n = (function () {
   /* say(key): play the key's clip; one clip at a time. Resolves with true
      when it has ended, false when there was no clip, it could not play
      (autoplay blocked, file not recorded yet) or it was cut by a later say
-     or by stop(). */
-  function say(key) {
+     or by stop(). say(key, { from, to }) plays one stretch of the clip,
+     in seconds -- one sentence of a line said a sentence at a time. */
+  function say(key, part) {
     var p = _pack();
     /* only a recorded line: a key with no clip yet is silence, not a 404 */
     var url = p && p.urls && p.urls[key];
     stop();
     if (!url || !window.GameAudio) return Promise.resolve(false);
-    var h = _playing = GameAudio.play(url);
+    var h = _playing = GameAudio.play(url, part ? { from: part.from, to: part.to } : undefined);
     return h.done.then(function (ok) {
       if (_playing === h) _playing = null;
       return ok;
@@ -325,7 +323,7 @@ var I18n = (function () {
 
   return {
     load: load,
-    t: t, has: has, fmt: fmt, html: html, applyStatic: applyStatic,
+    t: t, tDefault: tDefault, has: has, fmt: fmt, html: html, applyStatic: applyStatic,
     hasVoice: hasVoice, voice: voice, say: say, stop: stop, preload: preload,
     voiced: voiced, cues: cues, clips: clips,
     getLang: getLang, getLanguages: getLanguages, setLang: setLang

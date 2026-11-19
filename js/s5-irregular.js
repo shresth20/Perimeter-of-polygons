@@ -1,0 +1,197 @@
+/* ==========================================================================
+ * s5-irregular.js -- the perimeter of an irregular polygon
+ * --------------------------------------------------------------------------
+ * A regular heptagon, 4 cm a side. The learner drags any corner and the
+ * sides stop being equal; the shape settles on the storyboard's heptagon
+ * (4, 5, 3, 6, 4, 3, 5) and its perimeter is asked for, then walked.
+ * ========================================================================== */
+(function (global) {
+  'use strict';
+
+  var Flow = global.Flow, Beats = global.Beats, Pages = global.Pages, S = global.Shapes, W = global.W, M = global.Motion;
+  if (!Pages || !Pages.addSection) { console.error('s5-irregular.js: load js/pages.js first.'); return; }
+  var K = Pages.kit;
+  function T(k, r) { return global.T ? global.T(k, r) : k; }
+  var BEAT = K.BEAT, SHORT = K.SHORT, LOOK = K.LOOK;
+  var NUDGE_AFTER = 2400;
+  var CARD_AT = { right: '4%', top: '14%', width: '42%' };
+  var PX = 26;                  /* figure units per cm */
+  var CX = 300, CY = 218;
+  var SUM = [4, 5, 3, 6, 4, 3, 5];
+  /* the irregular heptagon with exactly those sides, in cm about its centre */
+  var IRR = [[0.142, -4.981], [3.782, -3.322], [4.645, 1.603], [3.055, 4.146], [-2.944, 4.273], [-4.577, 0.622], [-4.104, -2.341]]
+    .map(function (p) { return { x: S.round2(CX + p[0] * PX), y: S.round2(CY + p[1] * PX) }; });
+
+  var dom = null, group = null, layerNodes = [];
+  function build(kit) { dom = kit.dom(); group = document.getElementById('figIrregular'); }
+  function h(tag, cls, parent) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function cm(n) { return T('lblCm', { n: n }); }
+  function centreOf(el) { var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+  function infoCard(title, rows) {
+    var card = h('div', 'card', dom.layer);
+    Object.keys(CARD_AT).forEach(function (k) { card.style[k] = CARD_AT[k]; });
+    var t = h('p', 'card__title', card); t.textContent = T(title);
+    rows.forEach(function (r) { var e = h('div', 'card__row is-soft', card); e.textContent = T(r); });
+    layerNodes.push(card);
+    return card;
+  }
+
+  /* Any corner dragged: the shape is re-laid out under the finger, its
+     lengths rewritten live. Resolves once a corner has been moved and let
+     go (at once under Skip). */
+  function armVertex(shape) {
+    var drag = null, live = true;
+    shape.g.classList.add('is-live');
+    function k() { var m = dom.figure.getScreenCTM(); return m ? m.a : 1; }
+    function onDown(ev) {
+      if (!live || drag) return;
+      var i = shape.vhits.indexOf(ev.currentTarget);
+      ev.preventDefault();
+      drag = { i: i, id: ev.pointerId, ox: ev.clientX, oy: ev.clientY, x0: shape.pts[i].x, y0: shape.pts[i].y, moved: false };
+      try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
+      shape.vertices[i].classList.add('is-held');
+    }
+    function onMove(ev) {
+      if (!drag || ev.pointerId !== drag.id) return;
+      var dx = (ev.clientX - drag.ox) / k(), dy = (ev.clientY - drag.oy) / k();
+      if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+      var pts = shape.pts.slice();
+      pts[drag.i] = { x: Math.max(40, Math.min(560, drag.x0 + dx)), y: Math.max(30, Math.min(400, drag.y0 + dy)) };
+      shape.set(pts);
+    }
+    function onUp(ev) {
+      if (!drag || ev.pointerId !== drag.id) return;
+      var d = drag; drag = null;
+      shape.vertices[d.i].classList.remove('is-held');
+      if (d.moved) { live = false; dom.gate.dispatchEvent(new MouseEvent('click')); }
+    }
+    function onKey(ev) {
+      if (!live || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+      ev.preventDefault();
+      var i = shape.vhits.indexOf(ev.currentTarget);
+      var pts = shape.pts.slice();
+      pts[i] = { x: pts[i].x + 30, y: pts[i].y - 20 };
+      shape.set(pts);
+      live = false;
+      dom.gate.dispatchEvent(new MouseEvent('click'));
+    }
+    shape.vhits.forEach(function (v) { v.addEventListener('pointerdown', onDown); v.addEventListener('keydown', onKey); v.setAttribute('tabindex', '0'); });
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+    function off() {
+      live = false;
+      shape.vhits.forEach(function (v) { v.removeEventListener('pointerdown', onDown); v.removeEventListener('keydown', onKey); v.setAttribute('tabindex', '-1'); });
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      shape.g.classList.remove('is-live');
+    }
+    return Flow.once(dom.gate, { auto: true }).then(off, function (err) { off(); throw err; });
+  }
+
+  function sceneIrregular() {
+    var g = S.el('g');
+    var shape = null, card = null, card2 = null, sum = null;
+    return K.wipeBoard()
+      .then(function () { return K.say('i0Intro'); })
+      .then(function () { return Flow.wait(BEAT); })
+      .then(function () {
+        group.removeAttribute('hidden');
+        group.appendChild(g);
+        shape = S.build(g, S.regular(7, CX, CY, 120), {
+          inks: true, offset: 30, vertices: true,
+          labels: function (i, len) { return cm(Math.max(1, Math.round(len / PX))); }
+        });
+        return Flow.anim(Beats.drawShape(shape, { time: 1.4 }));
+      })
+      .then(function () { return Flow.anim(Beats.labelsIn(shape.labels, 0.1)); })
+      .then(function () {
+        card = infoCard('lblRegHept', ['lbl7Sides', 'lblEach4']);
+        return Flow.anim(Beats.cardIn(card));
+      })
+      .then(function () { return Flow.wait(SHORT); })
+      .then(function () { return K.say('i1Ask'); })
+      .then(function () {
+        return Flow.anim(M.to(shape.vertices, { opacity: 1, duration: M.dur(0.3), ease: 'power2.out', stagger: M.gap(0.05) }));
+      })
+      .then(function () {
+        var stopHand = null, touched = false;
+        K.quiet(Flow.wait(NUDGE_AFTER).then(function () {
+          if (touched) return;
+          stopHand = W.handDrag(function () { return centreOf(shape.vertices[1]); },
+                                function () { var c = centreOf(shape.vertices[1]); return { x: c.x + 50, y: c.y - 30 }; }, 56);
+        }));
+        shape.vhits.forEach(function (v) { v.addEventListener('pointerdown', function () { touched = true; if (stopHand) { stopHand(); stopHand = null; } }); });
+        return armVertex(shape).then(function () { if (stopHand) stopHand(); });
+      })
+      /* the sides settle on the heptagon the question is about */
+      .then(function () {
+        shape.opts.labels = SUM.map(cm);
+        return Promise.all([
+          Flow.anim(Beats.morphShape(shape, IRR, 1.1)),
+          Flow.anim(M.to(shape.vertices, { opacity: 0, duration: M.dur(0.4) })),
+          Flow.anim(Beats.cardOut(card))
+        ]);
+      })
+      .then(function () {
+        if (card.parentNode) card.parentNode.removeChild(card);
+        layerNodes = layerNodes.filter(function (n) { return n !== card; });
+        card2 = infoCard('lblIrrHept', ['lbl7Sides', 'lblNotEqual']);
+        return Flow.anim(Beats.cardIn(card2));
+      })
+      .then(function () { return Flow.anim(Beats.partPulse(shape.sides, 2)); })
+      .then(function () { return K.speakBySentence('i1Look'); })
+      .then(function () { return K.handOver(); })
+
+      /* ---- the question ---------------------------------------------------- */
+      .then(function () { return K.say('i2Ask'); })
+      .then(function () { return K.offerChoices([28, 30, 26, 35].map(cm)); })
+      .then(function (btns) {
+        return K.askUntilRight(btns, 1, {
+          onWrong: function (k) { return K.speakBySentence({ 0: 'i2Wrong28', 2: 'i2Wrong26', 3: 'i2Wrong35' }[k] || 'bWrongGeneric', 'confused'); }
+        });
+      })
+      .then(function () { return Flow.anim(Beats.cardOut(card2)); })
+      .then(function () {
+        if (card2.parentNode) card2.parentNode.removeChild(card2);
+        layerNodes = layerNodes.filter(function (n) { return n !== card2; });
+        sum = W.sumCard(dom.layer, { title: T('lblPerimeter'), style: CARD_AT });
+        layerNodes.push(sum.el);
+        return Flow.anim(Beats.cardIn(sum.el));
+      })
+      .then(function () {
+        return Flow.anim(Beats.walk(shape, 3.2, {
+          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); sum.term(String(SUM[k]), k); }
+        }));
+      })
+      .then(function () { return sum.result('= ' + cm(30)); })
+      .then(function () {
+        var c = shape.centre(); K.burstAt(c.x, c.y);
+        return K.speakBySentence('i2Right', 'happy');
+      })
+      .then(function () { return K.handOver(); })
+      .then(function () { return K.clearChoices(); });
+  }
+
+  function parts() { return [group]; }
+  function wipe() { var nodes = layerNodes.slice(); return nodes.length ? [Flow.anim(Beats.cardOut(nodes))] : []; }
+  function reset() {
+    group.setAttribute('hidden', '');
+    group.textContent = '';
+    layerNodes.forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+    layerNodes = [];
+  }
+  function stage() {}
+
+  Pages.addSection({
+    name: 'Irregular polygons',
+    scenes: [{ name: 'An irregular heptagon', play: sceneIrregular }],
+    build: build, parts: parts, wipe: wipe, reset: reset, stage: stage
+  });
+})(window);

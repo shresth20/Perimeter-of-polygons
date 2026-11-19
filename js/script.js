@@ -28,13 +28,13 @@
     }
     if (global.Scenery) {
       global.Scenery.snowfall(document.getElementById('snow'));
-      global.Scenery.titleFlakes(document.getElementById('welcomeFlakes'));
+      global.Scenery.welcomeSnow(document.getElementById('welcomeFlakes'), document.getElementById('welcome'));
     }
     global.Pages.init();
 
     var tasks = [];
     function add(name, weight, run, queued) { tasks.push({ name: name, weight: weight, run: run, queued: !!queued }); }
-    ['assets/images/bg.jpg'].forEach(function (src) {
+    ['assets/images/welcome-bg.jpg', 'assets/images/bg.jpg'].forEach(function (src) {
       add(src, 3, function () { return imageReady(src); });
     });
     Object.keys(global.Mascot.SHEETS).forEach(function (clip) {

@@ -31,19 +31,21 @@
  * remove this file and its <script> tag in index.html and nothing else in
  * the project knows it was here.
  *
- * Keyboard: Alt+Left a page back, Alt+Right skip ahead, Alt+R replay.
+ * Keyboard: Alt+Left a page back, Alt+Right skip ahead, Alt+N next page,
+ * Alt+R replay, Alt+D hide/show the bar.
  *
  * Load order: js/pages.js -> js/script.js -> js/devnav.js
  * ========================================================================== */
 (function (global) {
   'use strict';
 
-  /* TEMPORARILY OFF: the bar mounts only when the URL asks for it --
-     ?dev=1, or a ?scene=N jump link. Delete this block to bring it back. */
+  /* Mounted by default while the section is being worked on; ?dev=0 on
+     the URL keeps it off. Remove the <script> tag in index.html to ship
+     without it. */
   try {
     var q0 = new URLSearchParams(global.location.search);
-    if (!q0.has('dev') && !q0.has('scene')) return;
-  } catch (e) { return; }
+    if (q0.get('dev') === '0') return;
+  } catch (e) { /* no URL to read */ }
 
   var STORE = 'devnav.pages';        /* the page counts, for this session */
 
@@ -54,35 +56,36 @@
 
   var CSS = [
     '.devnav{',
-    /* Pinned to the WINDOW's bottom-right corner, not to the lesson's frame:
-       out in the letterbox below the board, clear of the whole stage. */
+    /* Centred along the WINDOW's bottom edge, in the letterbox under the
+       board, clear of the Next control in the board's corner. */
     '  position:fixed; z-index:9999;',
-    '  bottom:max(10px,env(safe-area-inset-bottom,0px));',
     '  right:max(10px,env(safe-area-inset-right,0px));',
+    '  bottom:max(8px,env(safe-area-inset-bottom,0px));',
     '  display:flex; align-items:center; gap:8px;',
-    '  padding:0px 0px; border-radius:999px;',
+    '  padding:0; background:none; border:0;',
     '  font-family:var(--font-body,system-ui,sans-serif);',
-    '  opacity:1; transition:opacity .18s ease;',
+    '  opacity:1; transition:opacity .18s ease, transform .25s ease;',
     '}',
-    /* Out of the way until it is wanted. */
-    '.devnav:hover,.devnav:focus-within{opacity:1;}',
+    '.devnav.is-hidden{transform:translateY(calc(100% + 12px));}',
     '.devnav__tag{',
-    '  padding:0 2px 0 8px; font-size:11px; font-weight:700; letter-spacing:.04em;',
-    '  color:#fff; white-space:nowrap; opacity:.85;',
+    '  padding:0 4px 0 0; font-size:11px; font-weight:700; letter-spacing:.04em;',
+    '  color:#fff; white-space:nowrap; opacity:.9;',
+    '  text-shadow:0 1px 2px rgba(20,52,96,.6);',
     '}',
     '.devnav__btn,.devnav__pick{',
     '  appearance:none; -webkit-appearance:none; cursor:pointer; white-space:nowrap;',
     '  padding:7px 14px; border-radius:999px;',
     '  border:1px solid rgba(255,255,255,.55);',
-    '  background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.72));',
-    '  color:#262A7A; font:inherit; font-size:13px; font-weight:700;',
+    '  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(220,240,255,.85));',
+    '  color:#1A3A6B; font:inherit; font-size:13px; font-weight:700;',
     '  line-height:1; transition:filter .15s ease, transform .1s ease;',
+    '  box-shadow:0 2px 8px rgba(20,52,96,.25);',
     '}',
+    '.devnav__btn--go{background:linear-gradient(180deg,#FFE9A8,#F8C94A); border-color:#D59E17;}',
     '.devnav__pick{',
-    '  max-width:220px; padding-right:28px; text-overflow:ellipsis;',
-    /* the chevron, drawn rather than fetched */
+    '  max-width:240px; padding-right:28px; text-overflow:ellipsis;',
     '  background-image:url("' + ARROW + '"),' +
-      'linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.72));',
+      'linear-gradient(180deg,rgba(255,255,255,.96),rgba(220,240,255,.85));',
     '  background-repeat:no-repeat,no-repeat;',
     '  background-position:right 11px center,center;',
     '  background-size:10px auto,auto;',
@@ -92,6 +95,15 @@
     '.devnav__btn:focus-visible,.devnav__pick:focus-visible{',
     '  outline:2px solid #FFF; outline-offset:2px;}',
     '.devnav__btn[disabled]{opacity:.42; cursor:default; filter:none;}',
+    /* The tab that brings a hidden bar back. */
+    '.devnav-tab{',
+    '  position:fixed; z-index:9999; right:max(14px,env(safe-area-inset-right,0px));',
+    '  bottom:0; padding:3px 14px 2px; border-radius:10px 10px 0 0;',
+    '  border:1px solid rgba(255,255,255,.35); border-bottom:0;',
+    '  background:rgba(20,52,96,.78); color:#fff; font:700 11px/1.2 var(--font-body,system-ui,sans-serif);',
+    '  cursor:pointer; display:none; letter-spacing:.04em;',
+    '}',
+    '.devnav-tab.is-shown{display:block;}',
     '@media (max-width:820px){',
     '  .devnav{gap:6px; padding:5px 6px;}',
     '  .devnav__btn,.devnav__pick{padding:6px 10px; font-size:12px;}',
@@ -177,6 +189,35 @@
     var skip  = button('Skip »', 'Forward to the Next button (Alt+Right)', fwd);
     var again = button('↺ Replay', 'This page again (Alt+R)',
                        function () { go(at, page); });
+    /* Next: the lesson's own Next pressed for you -- after a Skip, if it
+       is not up yet. */
+    var next  = button('Next ›', 'Skip to Next and press it (Alt+N)', function () {
+      var b = document.getElementById('nextBtn');
+      if (b && !b.hidden) { b.click(); return; }
+      fwd();
+      var tries = 0;
+      var t = setInterval(function () {
+        var nb = document.getElementById('nextBtn');
+        if (nb && !nb.hidden) { clearInterval(t); nb.click(); }
+        else if (++tries > 60) clearInterval(t);
+      }, 100);
+    });
+    next.className += ' devnav__btn--go';
+    var hide  = button('✕', 'Hide the dev bar (Alt+D)', function () { toggle(true); });
+    hide.style.padding = '7px 10px';
+
+    var tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'devnav-tab';
+    tab.textContent = 'DEV ▴';
+    tab.title = 'Show the dev bar (Alt+D)';
+    tab.addEventListener('click', function () { toggle(false); });
+    function toggle(off) {
+      if (off == null) off = !bar.classList.contains('is-hidden');
+      bar.classList.toggle('is-hidden', off);
+      tab.classList.toggle('is-shown', off);
+      try { sessionStorage.setItem('devnav.hidden', off ? '1' : '0'); } catch (e) {}
+    }
 
     var bar = document.createElement('div');
     bar.className = 'devnav';
@@ -186,10 +227,14 @@
     bar.appendChild(pick);
     bar.appendChild(prev);
     bar.appendChild(skip);
+    bar.appendChild(next);
     bar.appendChild(again);
+    bar.appendChild(hide);
 
     /* On the body: the bar belongs to the window, not to the staged lesson. */
     document.body.appendChild(bar);
+    document.body.appendChild(tab);
+    try { if (sessionStorage.getItem('devnav.hidden') === '1') toggle(true); } catch (e) {}
 
     /* The list is rebuilt only when the lesson has shown a page it had not
        shown before; `shape` is what that is judged on. */
@@ -255,6 +300,8 @@
       if (k === 'ArrowLeft')           { ev.preventDefault(); back(); }
       else if (k === 'ArrowRight')     { ev.preventDefault(); fwd(); }
       else if (k === 'r' || k === 'R') { ev.preventDefault(); go(at, page); }
+      else if (k === 'n' || k === 'N') { ev.preventDefault(); next.click(); }
+      else if (k === 'd' || k === 'D') { ev.preventDefault(); toggle(); }
     });
 
     /* ?scene=N&page=M opens the lesson at that page (both from 0); with

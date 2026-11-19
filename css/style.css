@@ -1,0 +1,744 @@
+/* ==========================================================================
+   Perimeter of Polygons -- base layer: the ice theme
+   A frozen lake (assets/images/bg.jpg) with a frosted-ice board floating on
+   it, Swiftee on the header, snow drifting behind. Every colour below is a
+   token; no scene writes a raw hex value.
+   ========================================================================== */
+
+/* ---- Fonts (bundled, offline only) ----------------------------------------
+   Lilita One for the title, headings, numbers and every word set on the
+   figure; Baloo 2 for the lines the bird says. */
+@font-face {
+  font-family: "Lilita One";
+  src: url("../assets/fonts/trig_text/trigtext-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Baloo 2";
+  src: url("../assets/fonts/baloo_2/baloo2-variablefont_wght.woff2") format("woff2-variations");
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+/* ==========================================================================
+   Tokens
+   ========================================================================== */
+:root {
+  /* ---- the ice palette ---------------------------------------------- */
+  --ink:        #1A3A6B;     /* deep lake blue: every word                */
+  --ink-soft:   #4D6C9C;
+  --snow:       #FFFFFF;
+  --ice-1:      #EEF8FF;     /* the board's frost                          */
+  --ice-2:      #CDEBFB;
+  --ice-3:      #8FD4F7;
+  --ice-deep:   #2A9BD8;     /* rims, dashes, the slider track            */
+  --ice-ink:    #1474B8;
+
+  --berry:      #F2605F;     /* the berries in the art: Next, wrong-ish   */
+  --berry-deep: #C83E3E;
+  --gold:       #F8C94A;     /* the cabin's window light                   */
+  --gold-deep:  #D59E17;
+  --mint:       #6FE0C8;
+  --mint-deep:  #27AE95;
+  --lavender:   #A99CFF;
+  --lavender-deep: #6757DF;
+  --pink:       #FF7EB6;
+  --pink-deep:  #DF3F89;
+  --teal:       #2BB3C9;
+  --teal-deep:  #157F92;
+  --orange:     #F7A043;
+  --orange-deep:#D9741A;
+
+  /* ---- the sides of a shape: one ink per side, in this order ---------- */
+  --side-0: var(--ice-ink);
+  --side-1: var(--mint-deep);
+  --side-2: var(--lavender-deep);
+  --side-3: var(--berry-deep);
+  --side-4: var(--gold-deep);
+  --side-5: var(--pink-deep);
+  --side-6: var(--teal-deep);
+  --side-7: var(--orange-deep);
+
+  /* ---- right and wrong ------------------------------------------------- */
+  --right-fill:   #7BE49A;
+  --right-border: #26A94B;
+  --wrong-fill:   #FF8A8A;
+  --wrong-border: #E03A3A;
+
+  /* ---- the shapes' insides ---------------------------------------------- */
+  --shape-fill:      color-mix(in srgb, var(--ice-3) 42%, var(--snow));
+  --shape-fill-deep: color-mix(in srgb, var(--ice-deep) 38%, var(--snow));
+  --shape-line:      var(--ink);
+  --area-wash:       color-mix(in srgb, var(--ice-deep) 55%, var(--snow));
+  --perim-glow:      var(--gold);
+
+  /* ---- surfaces --------------------------------------------------------- */
+  --board-bg:   color-mix(in srgb, var(--snow) 78%, var(--ice-2));
+  --board-rim:  var(--snow);
+  --frost-line: color-mix(in srgb, var(--ice-deep) 22%, transparent);
+
+  --bubble-bg:  var(--snow);
+  --bubble-rim: var(--ice-3);
+  --bubble-ink: var(--ink);
+
+  --page-bg:      var(--ice-3);
+  --page-bg-deep: var(--ice-deep);
+
+  /* ---- raised controls -------------------------------------------------- */
+  --horizon:     color-mix(in srgb, var(--ice-deep) 36%, var(--ice-2));
+  --button-bg:   var(--ice-1);
+  --button-text: var(--ink);
+
+  --pill-border:   var(--ice-deep);
+  --pill-face-mid: color-mix(in srgb, var(--ice-2) 45%, var(--snow));
+  --pill-face-low: color-mix(in srgb, var(--ice-3) 55%, var(--snow));
+  --pill-wall:     color-mix(in srgb, var(--ice-ink) 80%, var(--horizon));
+
+  --next-rim:    var(--berry-deep);
+  --next-face-1: color-mix(in srgb, var(--berry) 50%, var(--snow));
+  --next-face-2: var(--berry);
+  --next-face-3: color-mix(in srgb, var(--berry) 70%, var(--berry-deep));
+  --next-arrow:  var(--snow);
+
+  --glow-board:      color-mix(in srgb, var(--snow) 70%, transparent);
+  --glow-board-soft: color-mix(in srgb, var(--ice-2) 55%, transparent);
+  --glow-board-dim:  color-mix(in srgb, var(--ice-deep) 25%, transparent);
+  --shadow-soft: color-mix(in srgb, var(--ink) 18%, transparent);
+  --shadow-deep: color-mix(in srgb, var(--ink) 32%, transparent);
+
+  --font-display: "Lilita One", "Baloo 2", system-ui, sans-serif;
+  --font-body: "Baloo 2", system-ui, sans-serif;
+
+  --art-page: url("../assets/images/bg.jpg");
+
+  /* ---- stacking ---------------------------------------------------------- */
+  --z-snow: 0;
+  --z-hero: 1;
+  --z-board: 2;
+  --z-stage: 1;
+  --z-layer: 2;
+  --z-footer: 3;
+  --z-header: 4;
+  --z-next: 6;
+  --z-welcome: 9;
+
+  --board-w: min(1500px, 96vw, 160vh);
+  --row-top: 16%;
+  --row-bottom: 11%;
+  --board-pad-y: clamp(10px, 2.2vh, 22px);
+  --board-pad-x: clamp(18px, calc(var(--board-w) * .032), 44px);
+  --stage-full-h: calc(var(--board-w) * 9 / 16 - 2 * var(--board-pad-y) - 6px);
+  --stage-full-w: calc(var(--board-w) - 2 * var(--board-pad-x) - 6px);
+}
+
+/* ---- Reset ------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; padding: 0; }
+body {
+  min-height: 100dvh;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  background:
+    var(--art-page) center / cover no-repeat,
+    linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-deep) 100%);
+  background-color: var(--page-bg);
+}
+
+/* ---- Snowfall ----------------------------------------------------------
+   A few dozen flakes drifting down behind everything. Transform and opacity
+   only; they stop under reduced motion. Built by js/scenery.js. */
+.snow {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-snow);
+  pointer-events: none;
+  overflow: hidden;
+}
+.snow__flake {
+  position: absolute;
+  top: -4vh;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, var(--snow) 0%, color-mix(in srgb, var(--snow) 70%, transparent) 55%, transparent 72%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* ---- Shell -------------------------------------------------------------- */
+#app {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  display: grid;
+  place-items: center;
+}
+.frame {
+  position: relative;
+  width: var(--board-w);
+  aspect-ratio: 16 / 9;
+}
+
+/* ==========================================================================
+   The board -- a slab of frosted ice
+   ========================================================================== */
+.board {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-board);
+  display: grid;
+  grid-template-rows: var(--row-top) minmax(0, 1fr) var(--row-bottom);
+  padding: var(--board-pad-y) var(--board-pad-x);
+  border-radius: clamp(20px, 3.6vh, 36px);
+  border: 3px solid var(--board-rim);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--snow) 86%, transparent) 0%,
+      color-mix(in srgb, var(--ice-1) 84%, transparent) 55%,
+      color-mix(in srgb, var(--ice-2) 80%, transparent) 100%);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+  box-shadow:
+    inset 0 2px 0 var(--snow),
+    inset 0 0 0 1px color-mix(in srgb, var(--ice-3) 45%, transparent),
+    0 0 14px 0 var(--glow-board),
+    0 0 34px 8px var(--glow-board-soft),
+    0 22px 48px var(--shadow-deep);
+  opacity: 0;
+  visibility: hidden;
+}
+.board.show { opacity: 1; visibility: visible; }
+.board.is-headless { --row-top: 0%; }
+.board.is-bare { --row-top: 0%; --row-bottom: 0%; }
+.board:not(:has(.board__bottom > :not([hidden]))) { --row-bottom: 0%; }
+.board { transition: grid-template-rows .45s ease; }
+
+/* The faint cracks in the ice: a few hairlines across the slab, in the
+   ice's own ink, so the surface reads as ice and not as paper. */
+.board__cracks {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: .55;
+}
+.board__cracks svg { width: 100%; height: 100%; display: block; }
+.board__cracks path {
+  fill: none;
+  stroke: var(--frost-line);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The snow cap lying along the top edge of the slab, and the two small
+   drifts at the bottom corners. Decoration only. */
+.board__cap {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: -3px;
+  height: clamp(14px, 3.2vh, 28px);
+  pointer-events: none;
+  overflow: visible;
+}
+.board__cap svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.board__cap path { fill: var(--snow); }
+.board__cap .cap__shade { fill: color-mix(in srgb, var(--ice-2) 60%, var(--snow)); }
+
+.board__top {
+  position: relative;
+  z-index: var(--z-header);
+  min-height: 0;
+  display: grid;
+  align-items: end;
+}
+.board__bottom {
+  position: relative;
+  z-index: var(--z-footer);
+  min-height: 0;
+}
+.board__stage {
+  position: relative;
+  z-index: var(--z-stage);
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* ---- The prompt row (header) ------------------------------------------- */
+.prompt {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+  padding-inline: clamp(8px, 2%, 28px);
+}
+.prompt__mascot {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: flex-end;
+  height: 120%;
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+.prompt__line {
+  margin: 0;
+  align-self: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(17px, 3.3vh, 32px);
+  line-height: 1.22;
+  color: var(--ink);
+}
+.prompt__line .type { white-space: pre-wrap; }
+
+/* The "1 of 5" counter, pinned to the board's top-right corner. */
+.counter {
+  position: absolute;
+  top: clamp(8px, 1.8vh, 18px);
+  right: clamp(10px, 2.2%, 28px);
+  z-index: var(--z-header);
+  padding: .18em .8em .22em;
+  border-radius: 999px;
+  border: 2px solid var(--ice-3);
+  background: color-mix(in srgb, var(--snow) 85%, var(--ice-2));
+  font-family: var(--font-display);
+  font-size: clamp(12px, 2.1vh, 20px);
+  letter-spacing: .4px;
+  color: var(--ice-ink);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--ice-3) 70%, transparent), 0 6px 14px var(--shadow-soft);
+  opacity: 0;
+  pointer-events: none;
+}
+.counter[hidden] { display: none; }
+
+/* ==========================================================================
+   The figure (one SVG) and the DOM layer over it
+   ========================================================================== */
+.figure {
+  position: absolute;
+  --figure-grow: 6%;
+  --figure-lift: 0%;
+  inset: calc(var(--figure-grow) / -2);
+  top: calc(var(--figure-grow) / -2 - var(--figure-lift));
+  display: block;
+  width: calc(100% + var(--figure-grow));
+  height: calc(100% + var(--figure-grow));
+  overflow: visible;
+  filter: drop-shadow(0 3px 5px var(--shadow-soft));
+}
+.figure g[hidden] { display: none; }
+.board:not(.is-headless):not(.is-bare) .figure { --figure-lift: 3%; }
+
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-layer);
+  pointer-events: none;
+}
+.layer > * { pointer-events: auto; }
+.layer[hidden] { display: none; }
+
+/* Every word set on the figure. User units, so it scales with the shape. */
+.figure-label {
+  font-family: var(--font-display);
+  font-size: 26px;
+  letter-spacing: .3px;
+  fill: var(--ink);
+  paint-order: stroke fill;
+  stroke: var(--snow);
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+
+/* ==========================================================================
+   The names to drag, and the answers to tap
+   ========================================================================== */
+.tray {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(6px, 1.2%, 16px);
+  padding: 0 1%;
+}
+.tray[hidden] { display: none; }
+.tray--choice { gap: clamp(12px, 2.6%, 40px); }
+
+.chip,
+.choice {
+  --edge: 4px;
+  position: relative;
+  appearance: none;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: .32em 1.15em .38em;
+  border: 3px solid var(--pill-border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--snow) 0%, var(--pill-face-mid) 55%, var(--pill-face-low) 100%);
+  box-shadow:
+    0 var(--edge) 0 var(--pill-wall),
+    0 calc(var(--edge) + 3px) 10px var(--shadow-soft);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(13px, min(3.1vh, 2vw), 27px);
+  line-height: 1.1;
+  letter-spacing: .4px;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: box-shadow .18s ease, border-color .18s ease, filter .18s ease, background .25s ease;
+}
+.chip { cursor: grab; touch-action: none; }
+.choice {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4em;
+  padding-inline: 1.4em;
+  font-size: clamp(14px, min(3.2vh, 2.2vw), 28px);
+}
+.chip:hover, .choice:hover { filter: brightness(1.03); }
+.chip:focus-visible, .choice:focus-visible { outline: none; border-color: var(--ice-ink); }
+.chip.is-lifted {
+  cursor: grabbing;
+  z-index: 5;
+  box-shadow: 0 var(--edge) 0 var(--pill-wall), 0 16px 28px var(--shadow-deep);
+}
+.chip.is-picked {
+  border-color: var(--ice-ink);
+  box-shadow:
+    0 var(--edge) 0 var(--pill-wall),
+    0 0 0 4px color-mix(in srgb, var(--ice-3) 60%, transparent),
+    0 calc(var(--edge) + 3px) 10px var(--shadow-soft);
+}
+.chip.is-docked { visibility: hidden; pointer-events: none; }
+
+.choice.is-right {
+  border-color: var(--right-border);
+  background: linear-gradient(180deg, var(--snow) 0%, color-mix(in srgb, var(--right-fill) 45%, var(--snow)) 100%);
+  box-shadow: 0 var(--edge) 0 var(--right-border), 0 calc(var(--edge) + 3px) 10px var(--shadow-soft);
+}
+.choice.is-wrong {
+  border-color: var(--wrong-border);
+  background: linear-gradient(180deg, var(--snow) 0%, color-mix(in srgb, var(--wrong-fill) 45%, var(--snow)) 100%);
+  box-shadow: 0 var(--edge) 0 var(--wrong-border), 0 calc(var(--edge) + 3px) 10px var(--shadow-soft);
+}
+.choice.is-done { cursor: default; pointer-events: none; }
+.choice.is-struck { opacity: .45; pointer-events: none; cursor: default; }
+
+/* ---- A fraction stood up (mathtext.js) ---------------------------------- */
+.frac {
+  display: inline-flex; flex-direction: column; justify-content: center; align-items: stretch;
+  vertical-align: middle; height: .9em; margin: 0 .1em 0 .04em;
+  font-weight: 800; line-height: 1; letter-spacing: 0; text-align: center; white-space: nowrap;
+}
+.frac__n, .frac__d { display: block; padding: 0 .14em; font-size: .7em; }
+.frac__n { padding-bottom: .08em; }
+.frac__d { padding-top: .1em; border-top: .12em solid currentColor; }
+
+/* ==========================================================================
+   Next and Restart
+   ========================================================================== */
+.next-btn {
+  --edge: 5px;
+  --sink: 0px;
+  position: absolute;
+  right: clamp(14px, 2.6%, 40px);
+  bottom: clamp(12px, 2.4%, 34px);
+  z-index: var(--z-next);
+  display: grid;
+  place-items: center;
+  width: clamp(56px, 9.2vh, 94px);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  filter: drop-shadow(0 5px 9px var(--shadow-soft));
+  cursor: pointer;
+  translate: 0 var(--sink);
+  opacity: 0;
+  transition: filter .18s ease;
+}
+.next-btn[hidden] { display: none; }
+.next-btn:hover, .next-btn:focus-visible {
+  filter: drop-shadow(0 8px 13px var(--shadow-soft)) brightness(1.05);
+  outline: none;
+}
+.next-btn:focus-visible { outline: 3px solid var(--ice-ink); outline-offset: 3px; }
+.next-btn svg { width: 100%; height: 100%; display: block; }
+
+.restart-btn {
+  --edge: 4px;
+  --sink: 0px;
+  position: absolute;
+  right: clamp(14px, 2.6%, 40px);
+  bottom: clamp(12px, 2.4%, 34px);
+  z-index: var(--z-next);
+  display: inline-flex;
+  align-items: center;
+  gap: .4em;
+  padding: .35em 1.1em .4em .8em;
+  border: 3px solid var(--pill-border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--snow) 0%, var(--pill-face-mid) 55%, var(--pill-face-low) 100%);
+  box-shadow: 0 var(--edge) 0 var(--pill-wall), 0 calc(var(--edge) + 3px) 10px var(--shadow-soft);
+  font-family: var(--font-display);
+  font-size: clamp(14px, 2.6vh, 24px);
+  color: var(--ink);
+  cursor: pointer;
+  translate: 0 var(--sink);
+  opacity: 0;
+}
+.restart-btn[hidden] { display: none; }
+.restart-btn svg { width: 1.3em; height: 1.3em; }
+
+/* ==========================================================================
+   The mascot and its slots
+   ========================================================================== */
+.slot { position: absolute; pointer-events: none; }
+.slot--hero {
+  z-index: var(--z-hero);
+  left: 24%;
+  bottom: 8%;
+  height: 44%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+}
+.mascot {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+}
+.mascot[hidden] { display: none; }
+.mascot.is-away { opacity: 0; }
+.hopper {
+  position: fixed;
+  display: none;
+  z-index: var(--z-hero);
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+}
+.hopper.on { display: block; will-change: transform; }
+
+/* ---- The speech bubble --------------------------------------------------- */
+.bubble {
+  --bub-u: 1em;
+  --bub-corner: calc(var(--bub-u) * .66);
+  --bub-light-w: calc(var(--bub-u) * .5);
+  --bub-light-h: calc(var(--bub-u) * .2);
+  --bub-light-x: calc(var(--bub-u) * .42);
+  --bub-light-y: calc(var(--bub-u) * .34);
+  --bub-tail-w: calc(var(--bub-u) * .76);
+  --bub-tail-x: calc(var(--bub-u) * .78);
+  --note-edge: var(--bubble-rim);
+  --bub-tip-x: 66%;
+  --bub-tip-y: 79%;
+
+  position: absolute;
+  left: calc(var(--bub-tip-x) - 4px - .815em);
+  bottom: calc(var(--bub-tip-y) + .725em - 8px);
+  width: max-content;
+  max-width: min(1000px, calc(100vw - 24px));
+  padding: .5em .85em;
+  border: 4px solid var(--note-edge);
+  border-radius: var(--bub-corner);
+  background: var(--bubble-bg);
+  box-shadow:
+    0 0 14px 2px var(--glow-board-soft),
+    0 0 34px 10px var(--glow-board-dim),
+    0 10px 26px var(--shadow-soft);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(14px, calc(var(--board-w) * .0236), 44px);
+  line-height: 1.2;
+  letter-spacing: .2px;
+  text-align: left;
+  color: var(--bubble-ink);
+  pointer-events: none;
+}
+.bubble[hidden] { display: none; }
+.bubble::before {
+  content: "";
+  position: absolute;
+  left: var(--bub-light-x);
+  top: var(--bub-light-y);
+  width: var(--bub-light-w);
+  height: var(--bub-light-h);
+  border-radius: 999px;
+  background: var(--ice-2);
+  transform: rotate(-22deg);
+  opacity: .9;
+}
+.bubble .type-wrap { display: inline-block; vertical-align: top; }
+.bubble-tail {
+  position: absolute;
+  left: var(--bub-tail-x);
+  top: calc(100% - 4px);
+  width: var(--bub-tail-w);
+  height: auto;
+  overflow: visible;
+}
+
+/* ==========================================================================
+   Welcome
+   ========================================================================== */
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-welcome);
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  padding: 0 clamp(16px, 5vw, 80px) clamp(28px, 12vh, 140px);
+  background:
+    var(--art-page) center / cover no-repeat,
+    linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-deep) 100%);
+}
+.welcome[hidden] { display: none; }
+
+/* The title, lettered in frost: white to ice, a deep-blue edge, a soft
+   glow -- and a snow cap on it, drawn by the SVG under it. */
+.welcome__title {
+  grid-row: 1;
+  align-self: center;
+  margin: 0;
+  padding-top: 2vh;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(40px, 9.4vh, 108px);
+  line-height: 1.02;
+  letter-spacing: 1px;
+  color: var(--snow);
+  -webkit-text-stroke: 0;
+  text-shadow:
+    0 2px 0 var(--ice-2),
+    0 4px 0 var(--ice-3),
+    0 6px 0 var(--ice-deep),
+    0 9px 0 var(--ice-ink),
+    0 14px 24px color-mix(in srgb, var(--ink) 45%, transparent),
+    0 0 32px color-mix(in srgb, var(--snow) 60%, transparent);
+  transform-origin: 50% 60%;
+}
+.welcome__title .t2 {
+  display: block;
+  color: var(--gold);
+  text-shadow:
+    0 2px 0 color-mix(in srgb, var(--gold) 60%, var(--snow)),
+    0 4px 0 var(--gold-deep),
+    0 6px 0 var(--orange-deep),
+    0 9px 0 color-mix(in srgb, var(--orange-deep) 70%, var(--ink)),
+    0 14px 24px color-mix(in srgb, var(--ink) 45%, transparent);
+}
+/* A ring of snowflakes drifting slowly round the title. */
+.welcome__flakes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.welcome__flakes svg {
+  position: absolute;
+  width: clamp(26px, 5vh, 60px);
+  height: auto;
+  color: var(--snow);
+  opacity: .85;
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--ice-ink) 40%, transparent));
+}
+
+/* ---- the loading line, where Start will stand ---------------------------- */
+.loader {
+  grid-row: 2;
+  grid-column: 1;
+  align-self: center;
+  justify-self: center;
+  position: relative;
+  width: clamp(240px, 32vw, 440px);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 5vh, 40px);
+  color: var(--snow);
+  padding: clamp(8px, 1.8vh, 18px) 0;
+  border: 4px solid transparent;
+  animation: loader-in .4s cubic-bezier(.2, .8, .3, 1) backwards;
+  transition: opacity .26s cubic-bezier(.5, 0, .75, 0), transform .26s cubic-bezier(.5, 0, .75, 0);
+}
+.loader::before { content: "\200b"; }
+.loader[hidden] { display: none; }
+.loader.is-done { opacity: 0; transform: translateY(-6px); }
+.loader__body {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  gap: clamp(6px, 1.2vh, 10px);
+}
+.loader__text {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 0 2px; font-size: .5em; letter-spacing: .6px; white-space: nowrap;
+  text-shadow: 0 2px 0 var(--ice-ink), 0 0 10px color-mix(in srgb, var(--ice-ink) 60%, transparent);
+}
+.loader__pct { font-variant-numeric: tabular-nums; }
+.loader__line {
+  position: relative; overflow: hidden;
+  height: clamp(6px, 1.1vh, 9px);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--snow) 30%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ice-ink) 50%, transparent),
+              0 0 0 1px color-mix(in srgb, var(--snow) 30%, transparent);
+}
+.loader__fill {
+  position: absolute; inset: 0; border-radius: inherit;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, var(--gold) 0%, var(--snow) 100%);
+  transition: transform .3s cubic-bezier(.2, .8, .3, 1);
+}
+@keyframes loader-in {
+  from { opacity: 0; transform: translateY(12px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+.start-btn {
+  grid-row: 2;
+  --edge: 5px;
+  --sink: 0px;
+  translate: 0 var(--sink);
+  align-self: center;
+  justify-self: center;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 5vh, 40px);
+  letter-spacing: 1.5px;
+  color: var(--button-text);
+  padding: clamp(8px, 1.8vh, 18px) clamp(28px, 5vw, 55px);
+  border: 4px solid var(--snow);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--snow) 0%, var(--button-bg) 55%, var(--ice-2) 100%);
+  box-shadow:
+    0 var(--edge) 0 var(--horizon),
+    0 0 14px 2px var(--glow-board-soft),
+    0 0 36px 12px var(--glow-board-dim),
+    0 calc(var(--edge) + 1px) 2px var(--shadow-soft),
+    0 calc(var(--edge) + 5px) calc(var(--edge) * 2 + 16px) var(--shadow-deep);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(16px) scale(.9);
+  transition: opacity .42s ease, transform .42s cubic-bezier(.2, .9, .3, 1.4), box-shadow .18s ease, filter .18s ease;
+}
+.start-btn[hidden] { display: none; }
+.start-btn.in { opacity: 1; transform: none; animation: start-pulse 2.1s ease-in-out .5s infinite; }
+.start-btn.in:hover, .start-btn.in:focus-visible { animation-play-state: paused; filter: brightness(1.04); outline: none; }
+.start-btn.is-3d { transition: opacity .42s ease, transform .42s cubic-bezier(.2, .9, .3, 1.4), filter .18s ease; }

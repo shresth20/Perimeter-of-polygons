@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title data-i18n="uiTitle">Perimeter of Polygons</title>
+
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/polygons.css" />
+  <link rel="stylesheet" href="css/animations.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+  <!-- Snow drifting down behind everything (js/scenery.js fills it). -->
+  <div class="snow" id="snow" aria-hidden="true"></div>
+
+  <main id="app">
+    <!-- The 16:9 box the whole lesson is staged in. -->
+    <div class="frame" id="frame">
+
+      <!-- The mascot's centre-stage slot, BEHIND the board on purpose. -->
+      <div class="slot slot--hero" id="slotHero">
+        <div class="bubble" id="bubble" hidden>
+          <span class="type-wrap" id="bubbleType">
+            <span class="type-ghost"></span>
+            <span class="type" aria-live="polite"><span class="txt"></span></span>
+          </span>
+          <svg class="bubble-tail" viewBox="0 0 44 42" aria-hidden="true">
+            <path d="M4 0 H42 V8 C36 20 24 30 2 42 C8 32 8 20 4 8 Z" fill="var(--bubble-bg)" />
+            <path d="M42 8 C36 20 24 30 2 42 C8 32 8 20 4 8" fill="none"
+                  stroke="var(--note-edge)" stroke-width="4"
+                  stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- The bird's stand-in for the half of every jump behind the board. -->
+      <div class="hopper" id="hopper" aria-hidden="true"></div>
+
+      <section class="board" id="board" aria-hidden="true">
+        <!-- The ice: faint cracks across the slab, and the snow lying on
+             its top edge. Decoration only. -->
+        <div class="board__cracks" aria-hidden="true">
+          <svg viewBox="0 0 1600 900" preserveAspectRatio="none">
+            <path d="M0 640 L180 600 L260 620 L420 560 L470 580" />
+            <path d="M260 620 L300 700 L340 712" />
+            <path d="M1600 300 L1420 340 L1340 330 L1200 380 L1130 372" />
+            <path d="M1340 330 L1310 250 L1280 236" />
+            <path d="M700 900 L760 800 L800 790 L860 700" />
+            <path d="M1020 0 L1000 70 L940 110" />
+          </svg>
+        </div>
+        <div class="board__cap" aria-hidden="true">
+          <svg viewBox="0 0 1600 40" preserveAspectRatio="none">
+            <path class="cap__shade" d="M0 0 H1600 V14 C1500 30 1420 10 1300 22 C1180 34 1100 8 960 20 C840 30 760 6 620 18 C500 28 400 8 280 20 C180 30 90 10 0 20 Z" />
+            <path d="M0 0 H1600 V8 C1480 22 1400 4 1290 14 C1170 24 1090 2 950 12 C830 22 750 0 610 10 C490 20 390 2 270 12 C170 22 80 4 0 12 Z" />
+          </svg>
+        </div>
+
+        <header class="board__top" id="boardTop">
+          <div class="prompt" id="prompt">
+            <div class="prompt__mascot" id="slotHeader"></div>
+            <p class="prompt__line">
+              <span class="type-wrap" id="promptType">
+                <span class="type-ghost"></span>
+                <span class="type" aria-live="polite"><span class="txt"></span></span>
+              </span>
+            </p>
+          </div>
+        </header>
+        <div class="counter" id="counter" hidden aria-live="polite"></div>
+
+        <div class="board__stage" id="boardStage">
+          <!-- The whole lesson's picture, in ONE svg: 1000 x 420, wide,
+               so a shape standing left leaves room for the working. Each
+               section builds its own group (js/shapes.js, the sections). -->
+          <svg class="figure" id="figure" viewBox="0 0 1000 420"
+               role="img" data-i18n-attr="aria-label:a11yFigure" aria-label="The shapes on the board">
+            <defs>
+              <!-- The bloom under a mark while it is named: a blurred copy of
+                   the mark itself, so the glow is in the mark's OWN ink. -->
+              <filter id="partGlow" filterUnits="userSpaceOnUse" x="-200" y="-200" width="1400" height="820">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="bloom" />
+                <feMerge>
+                  <feMergeNode in="bloom" />
+                  <feMergeNode in="bloom" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="softBlur" filterUnits="userSpaceOnUse" x="-200" y="-200" width="1400" height="820">
+                <feGaussianBlur stdDeviation="5" />
+              </filter>
+            </defs>
+            <!-- Each section's own group, in playing order. -->
+            <g id="figWarm" hidden></g>
+            <g id="figBasics" hidden></g>
+            <g id="figNames" hidden></g>
+            <g id="figSort" hidden></g>
+            <g id="figRegular" hidden></g>
+            <g id="figIrregular" hidden></g>
+            <g id="figComposite" hidden></g>
+            <!-- Where a burst of confetti is thrown over the figure. -->
+            <g id="figBurst" aria-hidden="true"></g>
+          </svg>
+
+          <!-- The DOM over the picture: cards, the working pane, sliders. -->
+          <div class="layer" id="layer" data-i18n-attr="aria-label:a11yLayer" aria-label="The working"></div>
+        </div>
+
+        <footer class="board__bottom" id="boardBottom">
+          <div class="tray" id="tray" hidden data-i18n-attr="aria-label:a11yNamesTray" aria-label="Names to drag"></div>
+          <div class="tray tray--choice" id="choices" hidden role="group"
+               data-i18n-attr="aria-label:a11yAnswers" aria-label="Choose your answer"></div>
+        </footer>
+      </section>
+
+      <!-- One element for a beat finished by SEVERAL actions to announce on. -->
+      <span id="gate" hidden></span>
+
+      <!-- Next: a berry-red disc with a white arrow. -->
+      <button class="next-btn" id="nextBtn" type="button" hidden data-i18n-attr="aria-label:a11yNext" aria-label="Next">
+        <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="icoNextFace" x1="50" y1="8" x2="50" y2="92" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="var(--next-face-1)" />
+              <stop offset=".55" stop-color="var(--next-face-2)" />
+              <stop offset="1" stop-color="var(--next-face-3)" />
+            </linearGradient>
+          </defs>
+          <circle cx="50" cy="51.5" r="45" fill="var(--next-rim)" />
+          <circle cx="50" cy="50" r="41.5" fill="url(#icoNextFace)" />
+          <path d="M31.25 43.125 H52.5 V31.25 L77.5 50 L52.5 68.75 V56.875 H31.25 Z"
+                fill="var(--next-arrow)" stroke="var(--next-arrow)" stroke-width="8.75"
+                stroke-linejoin="round" stroke-linecap="round" />
+        </svg>
+      </button>
+
+      <!-- Play again, at the end, in Next's corner. -->
+      <button class="restart-btn" id="restartBtn" type="button" hidden>
+        <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+          <path d="M63 27.5 A26 26 0 1 1 37 27.5" fill="none" stroke="var(--ink)" stroke-width="12" stroke-linecap="round" />
+          <path d="M51 19.5 L41.8 39.8 L28.8 17.2 Z" fill="var(--ink)" stroke="var(--ink)" stroke-width="8" stroke-linejoin="round" />
+        </svg>
+        <span data-i18n="btnRestart">Play again</span>
+      </button>
+    </div>
+
+    <!-- Welcome, over everything until Start is pressed. -->
+    <section class="welcome" id="welcome">
+      <div class="welcome__flakes" id="welcomeFlakes" aria-hidden="true"></div>
+      <h1 class="welcome__title" id="welcomeTitle">
+        <span class="t1" data-i18n="uiTitleTop">Perimeter of</span>
+        <span class="t2" data-i18n="uiTitleBottom">Polygons</span>
+      </h1>
+      <div class="loader" id="loader" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+           aria-valuenow="0" data-i18n-attr="aria-label:loadingAria">
+        <span class="loader__body">
+          <span class="loader__text"><span data-i18n="loadingLabel"></span><span class="loader__pct" id="loaderPct"></span></span>
+          <span class="loader__line"><span class="loader__fill" id="loaderFill"></span></span>
+        </span>
+      </div>
+      <button class="start-btn" id="startBtn" type="button" hidden data-i18n="btnStart">Start</button>
+    </section>
+  </main>
+
+  <script src="js/libs/gsap.min.js"></script>
+  <script src="js/libs/Flip.min.js"></script>
+  <!-- Words by key (js/i18n.js) from locales/locales.json; the .js copy is
+       read first so file:// works too. -->
+  <script src="locales/locales.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/motion.js"></script>
+  <script src="js/flow.js"></script>
+  <script src="js/mathtext.js"></script>
+  <script src="js/typer.js"></script>
+  <script src="js/mascot.js"></script>
+  <script src="js/scenery.js"></script>
+  <script src="js/shapes.js"></script>
+  <script src="js/animations.js"></script>
+  <script src="js/widgets.js"></script>
+  <script src="js/pages.js"></script>
+  <!-- The sections of the lesson, in playing order. -->
+  <script src="js/s1-warmup.js"></script>
+  <script src="js/s2-basics.js"></script>
+  <script src="js/s3-polygons.js"></script>
+  <script src="js/s4-regular.js"></script>
+  <script src="js/s5-irregular.js"></script>
+  <script src="js/s6-composite.js"></script>
+  <script src="js/loader.js"></script>
+  <script src="js/script.js"></script>
+  <!-- The Back / Skip / Replay page bar, shown only with ?dev=1 on the URL. -->
+  <script src="js/devnav.js"></script>
+</body>
+</html>

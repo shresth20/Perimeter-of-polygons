@@ -1,0 +1,115 @@
+/* ==========================================================================
+   Motion layer. Transform, opacity and filter only.
+   ========================================================================== */
+.is-animating { will-change: transform, opacity; }
+.board.is-animating { transition: none; }
+
+/* ---- the text reveal (js/typer.js) ------------------------------------- */
+.type-wrap  { position: relative; display: inline-block; }
+.type-ghost { visibility: hidden; }
+.type { position: absolute; inset: 0; text-align: left; white-space: nowrap; }
+.bubble .type { text-align: left; }
+.wd { opacity: 0; }
+.wd.in { animation: wd-in .46s cubic-bezier(.2, .7, .3, 1) both; }
+@keyframes wd-in {
+  from { opacity: 0; filter: blur(4px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+
+/* ---- Start, breathing ---------------------------------------------------- */
+@keyframes start-pulse {
+  0%, 100% {
+    box-shadow: 0 var(--edge) 0 var(--horizon),
+                0 0 14px 2px var(--glow-board-soft),
+                0 0 36px 12px var(--glow-board-dim),
+                0 calc(var(--edge) + 1px) 2px var(--shadow-soft),
+                0 calc(var(--edge) + 5px) calc(var(--edge) * 2 + 16px) var(--shadow-deep);
+  }
+  50% {
+    box-shadow: 0 var(--edge) 0 var(--horizon),
+                0 0 26px 8px var(--glow-board),
+                0 0 62px 24px var(--glow-board-soft),
+                0 calc(var(--edge) + 1px) 2px var(--shadow-soft),
+                0 calc(var(--edge) + 5px) calc(var(--edge) * 2 + 16px) var(--shadow-deep);
+  }
+}
+
+/* ---- a side breathing while it is named ---------------------------------
+   A CSS loop, because its length is a beat's to decide: --pulse-times is
+   written by Beats.pulseHold / partPulse. */
+.shape__side.is-pulsing {
+  animation: side-breathe 1.05s ease-in-out var(--pulse-times, 3);
+  filter: url(#partGlow);
+}
+@keyframes side-breathe {
+  0%, 100% { stroke-width: 5; }
+  50%      { stroke-width: 9; }
+}
+.shape__perim.is-pulsing { animation: perim-breathe 1.2s ease-in-out infinite; }
+@keyframes perim-breathe {
+  0%, 100% { opacity: .75; }
+  50%      { opacity: 1; }
+}
+.shape__area.is-pulsing { animation: area-breathe 1.2s ease-in-out infinite; }
+@keyframes area-breathe {
+  0%, 100% { opacity: .75; }
+  50%      { opacity: 1; }
+}
+
+/* ---- a blank asking to be filled ------------------------------------------ */
+.term.is-asking { animation: blank-ask 1.2s ease-in-out infinite; }
+@keyframes blank-ask {
+  0%, 100% { border-color: var(--ice-deep); }
+  50%      { border-color: var(--gold-deep); }
+}
+
+/* ---- the sliders, the tapped sides: see polygons.css ---------------------- */
+
+/* ---- the ripple a tap leaves ----------------------------------------------- */
+.mo-ripple {
+  position: fixed;
+  z-index: 50;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  pointer-events: none;
+}
+
+/* ---- confetti ----------------------------------------------------------- */
+.confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.confetti__bit {
+  position: absolute;
+  left: 0; top: 0;
+  width: 10px; height: 7px;
+  border-radius: 2px;
+  opacity: 0;
+}
+.confetti__bit--round { width: 8px; height: 8px; border-radius: 50%; }
+.confetti__bit--blue { background: var(--ice-deep); }
+.confetti__bit--mint { background: var(--mint); }
+.confetti__bit--lavender { background: var(--lavender); }
+.confetti__bit--berry { background: var(--berry); }
+.confetti__bit--gold { background: var(--gold); }
+.confetti__bit--snow { background: var(--snow); }
+.qz-bit--blue { fill: var(--ice-deep); }
+.qz-bit--mint { fill: var(--mint); }
+.qz-bit--lavender { fill: var(--lavender); }
+.qz-bit--berry { fill: var(--berry); }
+.qz-bit--gold { fill: var(--gold); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wd.in { animation-duration: .01s; }
+  .start-btn.in { animation: none; }
+  .shape__side.is-pulsing, .shape__perim.is-pulsing, .shape__area.is-pulsing, .term.is-asking { animation: none; }
+  .slider.is-asking .slider__thumb { animation: none; }
+  .loader, .loader__fill { animation: none; transition: none; }
+}

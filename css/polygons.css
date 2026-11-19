@@ -1,0 +1,420 @@
+/* ==========================================================================
+   The figure: shapes, their sides and labels, buckets, name boxes -- and the
+   DOM cards, panes and sliders laid over the stage.
+   ========================================================================== */
+
+/* ---- A shape --------------------------------------------------------------
+   One group per shape (js/shapes.js builds it): the fill, one path per
+   side in its own ink, the outline the pen draws, the trace the light runs
+   along, the labels, and the hit areas. Everything rests invisible; the
+   beats reveal it. */
+.shape__fill {
+  fill: var(--shape-fill);
+  opacity: 0;
+}
+.shape__fill.is-deep { fill: var(--shape-fill-deep); }
+.shape__outline {
+  fill: none;
+  stroke: var(--shape-line);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.shape__side {
+  fill: none;
+  stroke: var(--c, var(--shape-line));
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: stroke .3s ease;
+}
+/* A side lit while it is named: its own ink, swollen and bloomed. */
+.shape__side.is-lit {
+  filter: url(#partGlow);
+}
+.shape__side.is-dim { opacity: .28; }
+.shape__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 34;
+  stroke-linecap: round;
+  cursor: pointer;
+  outline: none;
+  pointer-events: none;
+}
+.shape.is-live .shape__hit { pointer-events: stroke; }
+.shape.is-live .shape__hit.is-done { pointer-events: none; cursor: default; }
+.shape__hit:focus-visible { stroke: color-mix(in srgb, var(--ice-deep) 25%, transparent); }
+.shape__tip {
+  fill: var(--gold);
+  stroke: var(--snow);
+  stroke-width: 2.6;
+  opacity: 0;
+}
+.shape__vertex {
+  fill: var(--snow);
+  stroke: var(--ink);
+  stroke-width: 3;
+  opacity: 0;
+}
+.shape__vertex-hit {
+  fill: transparent;
+  cursor: grab;
+  outline: none;
+  pointer-events: none;
+}
+.shape.is-live .shape__vertex-hit { pointer-events: all; }
+.shape__vertex-hit:focus-visible { stroke: var(--ice-deep); stroke-width: 3; stroke-dasharray: 4 4; }
+.shape__vertex.is-held { fill: var(--gold); }
+
+/* The words on a shape: a side's length, or its letter, in the side's ink. */
+.shape__label {
+  fill: var(--c, var(--ink));
+  font-size: 25px;
+  opacity: 0;
+}
+.shape__name {
+  fill: var(--ink);
+  font-size: 24px;
+  opacity: 0;
+}
+
+/* The two kinds of highlight the warm-up asks about: the boundary, as a
+   thick golden stroke, and the inside, as a deep wash. */
+.shape__perim {
+  fill: none;
+  stroke: var(--perim-glow);
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  filter: url(#partGlow);
+}
+.shape__area {
+  fill: var(--area-wash);
+  opacity: 0;
+}
+
+/* The light that walks the boundary: a golden halo, a white core and the
+   trail it leaves (see Beats.walk). One dash per layer, placed by the beat. */
+.skate { opacity: 0; pointer-events: none; }
+.skate path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.skate__halo  { stroke: var(--gold); stroke-width: 20; stroke-opacity: .75; filter: url(#softBlur); }
+.skate__trail { stroke: var(--snow); stroke-width: 4; stroke-opacity: .55; }
+.skate__head  { stroke: var(--snow); stroke-width: 7; }
+
+/* The join inside a composite shape: dashed, in a soft ink -- the line we
+   do NOT walk along. */
+.inner-line {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 3.5;
+  stroke-dasharray: 9 8;
+  stroke-linecap: round;
+  opacity: 0;
+}
+.inner-line.is-no { stroke: var(--wrong-border); }
+
+/* The lights round the rangoli. */
+.light {
+  fill: var(--gold);
+  stroke: var(--snow);
+  stroke-width: 1.5;
+  opacity: 0;
+}
+
+/* ---- A bucket ----------------------------------------------------------
+   An ice bucket: a glassy trapezoid with a rim, and its name on a band. */
+.bucket { opacity: 0; }
+.bucket__body {
+  fill: color-mix(in srgb, var(--ice-2) 70%, var(--snow));
+  stroke: var(--ice-deep);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  transition: fill .25s ease, stroke .25s ease;
+}
+.bucket__rim {
+  fill: color-mix(in srgb, var(--ice-3) 60%, var(--snow));
+  stroke: var(--ice-deep);
+  stroke-width: 3.5;
+  transition: fill .25s ease, stroke .25s ease;
+}
+.bucket__sheen { fill: var(--snow); opacity: .55; }
+.bucket__label {
+  fill: var(--ink);
+  font-size: 28px;
+  paint-order: stroke fill;
+  stroke: var(--snow);
+  stroke-width: 6;
+}
+.bucket.is-over .bucket__body { fill: color-mix(in srgb, var(--gold) 35%, var(--snow)); stroke: var(--gold-deep); }
+.bucket.is-over .bucket__rim  { stroke: var(--gold-deep); }
+.bucket.is-right .bucket__body { fill: color-mix(in srgb, var(--right-fill) 40%, var(--snow)); stroke: var(--right-border); }
+.bucket.is-right .bucket__rim  { stroke: var(--right-border); }
+.bucket.is-wrong .bucket__body { fill: color-mix(in srgb, var(--wrong-fill) 40%, var(--snow)); stroke: var(--wrong-border); }
+.bucket.is-wrong .bucket__rim  { stroke: var(--wrong-border); }
+
+/* The shape being sorted, in the hand. */
+.shape.is-draggable { cursor: grab; }
+.shape.is-draggable .shape__hitbox { pointer-events: all; cursor: grab; }
+.shape__hitbox { fill: transparent; pointer-events: none; outline: none; }
+.shape.is-lifted { cursor: grabbing; }
+.shape.is-picked .shape__outline { stroke: var(--gold-deep); }
+
+/* ---- A name box under a figure ----------------------------------------- */
+.q-box { opacity: 0; transition: opacity .34s ease; outline: none; pointer-events: none; }
+.q-box.is-shown { opacity: 1; }
+.q-box.is-shown.is-quiet { opacity: .55; }
+.q-box.is-shown.is-quiet.is-over,
+.q-box.is-shown.is-quiet.is-right,
+.q-box.is-shown.is-quiet.is-wrong,
+.q-box.is-shown.is-quiet.is-target { opacity: 1; }
+.is-live .q-box { pointer-events: all; cursor: pointer; }
+.is-live .q-box.is-right { pointer-events: none; cursor: default; }
+.q-box__rect {
+  fill: var(--snow);
+  stroke: var(--ice-deep);
+  stroke-width: 2.6;
+  stroke-dasharray: 8 6;
+  transition: stroke .25s ease, fill .25s ease, stroke-width .25s ease;
+}
+.q-box.is-target .q-box__rect,
+.q-box.is-over .q-box__rect { fill: color-mix(in srgb, var(--gold) 28%, var(--snow)); stroke: var(--gold-deep); stroke-width: 3.4; }
+.q-box.is-right .q-box__rect { fill: color-mix(in srgb, var(--right-fill) 30%, var(--snow)); stroke: var(--right-border); stroke-width: 3.4; stroke-dasharray: none; }
+.q-box.is-wrong .q-box__rect { fill: color-mix(in srgb, var(--wrong-fill) 30%, var(--snow)); stroke: var(--wrong-border); stroke-width: 3.4; stroke-dasharray: none; }
+.q-box:focus-visible .q-box__rect { stroke: var(--ice-ink); stroke-width: 3.6; stroke-dasharray: none; }
+.q-box__text { fill: var(--ink); font-size: 24px; opacity: 0; stroke: none; }
+.q-badge { opacity: 0; }
+.q-badge__ring { fill: var(--right-border); }
+.q-badge__tick { fill: none; stroke: var(--snow); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- The pointing hand ------------------------------------------------- */
+.hand-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  overflow: visible;
+}
+.hand-layer .hand {
+  fill: var(--snow);
+  stroke: var(--ink);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0;
+  filter: drop-shadow(0 3px 5px var(--shadow-deep));
+}
+.hand-layer .hand__ring {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  opacity: 0;
+}
+.drag-guide {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 8;
+  pointer-events: none;
+  opacity: 0;
+}
+.drag-guide__card {
+  position: absolute;
+  border: 3px dashed var(--ice-deep);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--snow) 70%, transparent);
+}
+.drag-guide__hand {
+  position: absolute;
+  left: -8px;
+  top: -4px;
+  width: 44px;
+  height: 52px;
+  overflow: visible;
+}
+.drag-guide__hand path {
+  fill: var(--snow);
+  stroke: var(--ink);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* ==========================================================================
+   The DOM layer: cards, the working pane, sliders, summaries
+   ========================================================================== */
+.card {
+  position: absolute;
+  padding: clamp(8px, 1.6vh, 16px) clamp(12px, 2vw, 24px);
+  border-radius: clamp(12px, 2vh, 20px);
+  border: 2.5px solid var(--snow);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--snow) 92%, transparent) 0%,
+    color-mix(in srgb, var(--ice-1) 90%, transparent) 100%);
+  box-shadow:
+    inset 0 1px 0 var(--snow),
+    0 0 0 1px color-mix(in srgb, var(--ice-3) 55%, transparent),
+    0 10px 24px var(--shadow-soft);
+  color: var(--ink);
+  opacity: 0;
+}
+.card__title {
+  margin: 0 0 .25em;
+  font-family: var(--font-display);
+  font-size: clamp(15px, 2.9vh, 28px);
+  letter-spacing: .4px;
+  color: var(--ice-ink);
+}
+.card__sub {
+  margin: 0 0 .3em;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(13px, 2.3vh, 22px);
+  color: var(--ink-soft);
+}
+.card__row {
+  display: flex;
+  align-items: center;
+  gap: .35em;
+  margin: .15em 0;
+  font-family: var(--font-display);
+  font-size: clamp(17px, 3.4vh, 34px);
+  letter-spacing: .5px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.card__row.is-result { color: var(--right-border); }
+.card__row.is-soft { color: var(--ink-soft); font-size: clamp(14px, 2.6vh, 26px); }
+.card__row.is-note { font-family: var(--font-body); font-weight: 700; font-size: clamp(13px, 2.3vh, 22px); color: var(--ink-soft); white-space: normal; }
+.term { color: var(--c, var(--ink)); }
+.term.is-op { color: var(--ink-soft); }
+.term.is-blank {
+  display: inline-block;
+  min-width: 1.1em;
+  border-bottom: .12em dashed var(--ice-deep);
+  color: transparent;
+}
+
+/* The pane: the right half of the stage, the shape standing left of it. */
+.pane {
+  position: absolute;
+  right: 1%;
+  top: 50%;
+  width: 46%;
+  transform: translateY(-50%);
+}
+.pane .card { position: relative; opacity: 1; }
+.pane[hidden] { display: none; }
+
+/* A grid of summary cards across the stage. */
+.grid {
+  position: absolute;
+  inset: 2% 3%;
+  display: grid;
+  gap: clamp(8px, 1.6vw, 20px);
+  align-items: stretch;
+}
+.grid--3 { grid-template-columns: repeat(3, 1fr); }
+.grid--2 { grid-template-columns: repeat(2, 1fr); }
+.grid .card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
+.grid .card svg { width: 100%; height: auto; max-height: 48%; overflow: visible; }
+.grid .card svg .shape__fill, .grid .card svg .shape__side, .grid .card svg .shape__label, .grid .card svg .shape__outline { opacity: 1; }
+.grid .card .card__row { justify-content: center; }
+.grid .card .card__title { margin-top: .2em; }
+.rule-line {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  transform: translateX(-50%);
+  padding: .3em 1.2em .35em;
+  border-radius: 999px;
+  border: 3px solid var(--gold);
+  background: color-mix(in srgb, var(--snow) 92%, var(--gold));
+  font-family: var(--font-display);
+  font-size: clamp(15px, 3vh, 30px);
+  color: var(--ink);
+  white-space: nowrap;
+  box-shadow: 0 6px 16px var(--shadow-soft);
+  opacity: 0;
+}
+
+/* The pattern table. */
+.ptable {
+  position: absolute;
+  inset: 4% 6%;
+  display: grid;
+  grid-template-rows: auto 1fr 1fr 1fr;
+  gap: clamp(6px, 1.2vh, 12px);
+}
+.ptable .card { position: relative; display: grid; grid-template-columns: 1.1fr 1.6fr 1fr 1.4fr; align-items: center; gap: 2%; padding-block: .3em; }
+.ptable .card svg { width: 100%; max-height: 100%; height: clamp(34px, 7vh, 70px); overflow: visible; }
+.ptable .card svg .shape__fill, .ptable .card svg .shape__side { opacity: 1; }
+.ptable .ptable__name { font-family: var(--font-body); font-weight: 700; font-size: clamp(13px, 2.5vh, 24px); }
+.ptable .ptable__sides { font-family: var(--font-display); font-size: clamp(15px, 3vh, 30px); color: var(--ice-ink); }
+.ptable .ptable__eq { font-family: var(--font-display); font-size: clamp(16px, 3.2vh, 32px); }
+.ptable__head {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 3.6vh, 36px);
+  color: var(--ice-ink);
+  opacity: 0;
+}
+
+/* ---- The sliders --------------------------------------------------------- */
+.slider {
+  margin: .3em 0 .5em;
+  font-size: clamp(13px, 2.4vh, 22px);
+  opacity: 0;
+}
+.slider__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .35em; font-family: var(--font-display); letter-spacing: .4px; }
+.slider__label { color: var(--c, var(--ink)); }
+.slider__value { color: var(--ink-soft); font-size: .9em; }
+.slider__track {
+  position: relative;
+  height: .72em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ice-3) 35%, var(--snow));
+  box-shadow: inset 0 .1em .2em var(--shadow-soft), 0 0 0 .1em color-mix(in srgb, var(--ice-3) 70%, transparent);
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+.slider__track:focus-visible { box-shadow: 0 0 0 .2em color-mix(in srgb, var(--ice-deep) 45%, transparent); }
+.slider__fill {
+  position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--ice-deep)) 55%, var(--snow)), var(--c, var(--ice-deep)));
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+.slider__thumb {
+  position: absolute;
+  left: 0; top: 50%;
+  width: 1.7em; height: 1.7em;
+  margin-left: -.85em;
+  border-radius: 50%;
+  border: .16em solid var(--c, var(--ice-deep));
+  background: linear-gradient(180deg, var(--snow) 0%, color-mix(in srgb, var(--c, var(--ice-deep)) 30%, var(--snow)) 100%);
+  box-shadow: 0 .2em .5em var(--shadow-deep);
+  transform: translate(0, -50%);
+  pointer-events: none;
+  transition: box-shadow .18s ease, border-color .25s ease;
+}
+.slider.is-asking .slider__thumb { animation: thumb-call 1.6s ease-in-out infinite; }
+.slider__thumb.is-held { box-shadow: 0 .3em .8em var(--shadow-deep); animation: none; }
+.slider.is-done .slider__thumb { border-color: var(--right-border); animation: none; }
+.slider.is-done .slider__fill { background: linear-gradient(90deg, var(--right-fill), var(--right-border)); }
+.slider.is-done .slider__track { cursor: default; pointer-events: none; }
+.slider--pink { --c: var(--pink-deep); }
+.slider--purple { --c: var(--lavender-deep); }
+@keyframes thumb-call {
+  0%, 100% { box-shadow: 0 .2em .5em var(--shadow-deep), 0 0 0 0 color-mix(in srgb, var(--c, var(--ice-deep)) 0%, transparent); }
+  50%      { box-shadow: 0 .2em .5em var(--shadow-deep), 0 0 0 .4em color-mix(in srgb, var(--c, var(--ice-deep)) 40%, transparent); }
+}
+
+/* The L-shape's movable sides wear the sliders' inks. */
+.side--pink   { --c: var(--pink-deep); }
+.side--purple { --c: var(--lavender-deep); }

@@ -38,8 +38,7 @@
       <div class="hopper" id="hopper" aria-hidden="true"></div>
 
       <section class="board" id="board" aria-hidden="true">
-        <!-- The ice: faint cracks across the slab, and the snow lying on
-             its top edge. Decoration only. -->
+        <!-- The ice: faint cracks across the slab. Decoration only. -->
         <div class="board__cracks" aria-hidden="true">
           <svg viewBox="0 0 1600 900" preserveAspectRatio="none">
             <path d="M0 640 L180 600 L260 620 L420 560 L470 580" />
@@ -48,12 +47,6 @@
             <path d="M1340 330 L1310 250 L1280 236" />
             <path d="M700 900 L760 800 L800 790 L860 700" />
             <path d="M1020 0 L1000 70 L940 110" />
-          </svg>
-        </div>
-        <div class="board__cap" aria-hidden="true">
-          <svg viewBox="0 0 1600 40" preserveAspectRatio="none">
-            <path class="cap__shade" d="M0 0 H1600 V14 C1500 30 1420 10 1300 22 C1180 34 1100 8 960 20 C840 30 760 6 620 18 C500 28 400 8 280 20 C180 30 90 10 0 20 Z" />
-            <path d="M0 0 H1600 V8 C1480 22 1400 4 1290 14 C1170 24 1090 2 950 12 C830 22 750 0 610 10 C490 20 390 2 270 12 C170 22 80 4 0 12 Z" />
           </svg>
         </div>
 
@@ -189,7 +182,8 @@
   <script src="js/s6-composite.js"></script>
   <script src="js/loader.js"></script>
   <script src="js/script.js"></script>
-  <!-- The Back / Skip / Replay page bar, shown only with ?dev=1 on the URL. -->
+  <!-- DEV: the page bar in the bottom-right corner (jump list, Back, Skip,
+       Next, Replay). ?dev=0 hides it; delete this line to ship without it. -->
   <script src="js/devnav.js"></script>
 </body>
 </html>

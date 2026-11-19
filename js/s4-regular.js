@@ -136,7 +136,7 @@
         group.removeAttribute('hidden');
         return DRAG.reduce(function (chain, f) {
           return chain.then(function () {
-            var s = S.build(group, S.regular(f.n, f.cx, 150, 72), { inks: true, labels: aLabels(f.n), offset: 20, name: f.name, nameGap: 34 });
+            var s = S.build(group, S.regular(f.n, f.cx, 138, 70), { inks: true, labels: aLabels(f.n), offset: 20, name: f.name, nameGap: 58 });
             s.labels.forEach(function (l) { l.setAttribute('font-size', '20'); });
             shapes.push(s);
             return Flow.anim(Beats.drawShape(s, { time: 0.7 })).then(function () {
@@ -146,7 +146,7 @@
         }, Promise.resolve());
       })
       .then(function () {
-        boxes = DRAG.map(function (f) { return K.buildBox(group, { name: f.opt, x: f.cx - 80, y: 296, w: 160 }); });
+        boxes = DRAG.map(function (f) { return K.buildBox(group, { name: f.opt, x: f.cx - 80, y: 304, w: 160 }); });
         return boxes.reduce(function (chain, b) { return chain.then(function () { return Flow.anim(Beats.boxIn(b)); }); }, Promise.resolve());
       })
       .then(function () {

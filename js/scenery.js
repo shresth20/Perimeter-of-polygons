@@ -1,8 +1,8 @@
 /* ==========================================================================
  * scenery.js -- the snow
  * --------------------------------------------------------------------------
- * A few dozen flakes drifting down behind the whole lesson, and a ring of
- * snowflakes turning slowly round the welcome's title. Plain GSAP, not
+ * A few dozen flakes drifting down behind the whole lesson, and the welcome
+ * painting's own snowflakes falling slowly from its sky. Plain GSAP, not
  * Motion: these loops belong to the page, not to a scene, so a Replay must
  * not kill them. Nothing under reduced motion.
  * ========================================================================== */
@@ -56,26 +56,139 @@
     return s;
   }
 
-  /* Snowflakes round the title: placed by hand, each turning at its own
-     pace and bobbing a little. */
-  var RING = [
-    { x: 14, y: 16, s: 1.0 }, { x: 24, y: 42, s: 0.7 }, { x: 10, y: 60, s: 0.85 },
-    { x: 82, y: 18, s: 0.9 }, { x: 88, y: 46, s: 0.7 }, { x: 76, y: 62, s: 1.1 },
-    { x: 36, y: 10, s: 0.6 }, { x: 62, y: 8, s: 0.75 }, { x: 50, y: 66, s: 0.65 }
+  /* ---- the welcome's snowflakes, falling --------------------------------
+     The painting (assets/images/welcome-bg.jpg, 1672 x 941) had five
+     snowflakes drawn on it; they are painted out and live here instead,
+     starting on the very spots they were drawn, then drifting down slowly,
+     turning and swaying, and coming back in from the top. More of the same
+     flakes and a dusting of small specks fill the sky around them.
+     One gsap.ticker loop, time-based, transform and opacity only. It does no
+     work while the welcome is hidden. Reduced motion: the five painted flakes
+     stand still where they were drawn. */
+  var ART_W = 1672, ART_H = 941;
+  var PAINTED = [               /* centre (art px) and diameter (art px)      */
+    { x: 768, y: 62, d: 50 }, { x: 1327, y: 106, d: 50 }, { x: 333, y: 312, d: 66 },
+    { x: 1399, y: 437, d: 70 }, { x: 1051, y: 611, d: 50 }
   ];
-  function titleFlakes(host) {
+  var EXTRA_FLAKES = 9;         /* more of the painted flakes, spread about  */
+  var SPECKS = 26;              /* small soft dots, further away             */
+
+  /* The painted flake: six thick arms, each with one V of branches. */
+  var PAINTED_D = (function () {
+    var d = '';
+    for (var k = 0; k < 6; k++) {
+      var a = k * Math.PI / 3;
+      var ax = Math.cos(a), ay = Math.sin(a);
+      d += 'M0 0 L' + (ax * 42).toFixed(1) + ' ' + (ay * 42).toFixed(1) + ' ';
+      var bx = ax * 22, by = ay * 22;
+      [-1, 1].forEach(function (side) {
+        var b = a + side * 0.9;
+        d += 'M' + bx.toFixed(1) + ' ' + by.toFixed(1) + ' L' +
+             (bx + Math.cos(b) * 15).toFixed(1) + ' ' + (by + Math.sin(b) * 15).toFixed(1) + ' ';
+      });
+    }
+    return d.trim();
+  })();
+
+  function paintedFlakeSvg() {
+    var NS = 'http://www.w3.org/2000/svg';
+    var s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '-50 -50 100 100');
+    s.setAttribute('class', 'wflake');
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', PAINTED_D);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'currentColor');
+    p.setAttribute('stroke-width', '10');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    s.appendChild(p);
+    return s;
+  }
+
+  function welcomeSnow(host, welcome) {
     if (!host) return;
-    RING.forEach(function (r, i) {
-      var s = flakeSvg();
-      s.style.left = r.x + '%';
-      s.style.top = r.y + '%';
-      s.style.transform = 'scale(' + r.s + ')';
-      host.appendChild(s);
-      if (!gsap || reduced()) return;
-      gsap.to(s, { rotation: 360, duration: 18 + i * 3, ease: 'none', repeat: -1 });
-      gsap.to(s, { y: -10 - (i % 3) * 4, duration: 2.2 + (i % 4) * 0.5, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+    welcome = welcome || host.parentNode;
+    var calm = !gsap || reduced();
+    var flakes = [];
+    var box = { w: ART_W, h: ART_H, k: 1 };   /* the art's on-screen size    */
+
+    /* The flakes' box sits exactly over the art as `cover` fits it. */
+    function fit() {
+      var vw = welcome.clientWidth || global.innerWidth;
+      var vh = welcome.clientHeight || global.innerHeight;
+      var k = Math.max(vw / ART_W, vh / ART_H);
+      box.w = ART_W * k; box.h = ART_H * k; box.k = k;
+      host.style.width = box.w + 'px';
+      host.style.height = box.h + 'px';
+      host.style.left = (vw - box.w) / 2 + 'px';
+      host.style.top = (vh - box.h) / 2 + 'px';
+      flakes.forEach(function (f) {
+        var px = f.d * k;
+        f.el.style.width = px + 'px';
+        f.el.style.height = px + 'px';
+        place(f);
+      });
+    }
+    function place(f) {
+      var k = box.k, px = f.d * k;
+      var sway = f.amp * Math.sin(f.phase);
+      f.el.style.transform = 'translate(' + ((f.x + sway) * k - px / 2).toFixed(1) + 'px,' +
+        (f.y * k - px / 2).toFixed(1) + 'px) rotate(' + f.rot.toFixed(1) + 'deg)';
+    }
+
+    function make(kind, x, y, d) {
+      var el;
+      if (kind === 'speck') { el = document.createElement('i'); el.className = 'wflake wflake--speck'; }
+      else el = paintedFlakeSvg();
+      host.appendChild(el);
+      var depth = kind === 'speck' ? 0.45 + Math.random() * 0.3 : Math.min(1, d / 66);
+      var f = {
+        el: el, kind: kind, x: x, y: y, d: d,
+        vy: (22 + Math.random() * 14) * depth,         /* art px per second   */
+        amp: 10 + Math.random() * 22,                  /* sway, art px        */
+        phase: Math.random() * Math.PI * 2,
+        vphase: 0.35 + Math.random() * 0.4,            /* sway, rad per second*/
+        rot: Math.random() * 60,
+        vr: (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 14)
+      };
+      el.style.opacity = kind === 'speck' ? (0.45 + Math.random() * 0.4).toFixed(2) : '0.96';
+      flakes.push(f);
+      return f;
+    }
+
+    PAINTED.forEach(function (p) { make('flake', p.x, p.y, p.d); });
+    if (!calm) {
+      for (var i = 0; i < EXTRA_FLAKES; i++) {
+        make('flake', Math.random() * ART_W, Math.random() * ART_H, 30 + Math.random() * 30);
+      }
+      for (var j = 0; j < SPECKS; j++) {
+        make('speck', Math.random() * ART_W, Math.random() * ART_H, 7 + Math.random() * 9);
+      }
+    }
+    fit();
+    global.addEventListener('resize', fit);
+    if (calm) return;
+
+    /* Back in from the top, somewhere new, once a flake has left the bottom. */
+    function respawn(f) {
+      f.y = -f.d;
+      f.x = Math.random() * ART_W;
+      f.phase = Math.random() * Math.PI * 2;
+    }
+    gsap.ticker.add(function (time, deltaMs) {
+      if (welcome.hidden) return;
+      var dt = Math.min(deltaMs, 100) / 1000;    /* a hidden tab does not leap */
+      for (var n = 0; n < flakes.length; n++) {
+        var f = flakes[n];
+        f.y += f.vy * dt;
+        f.phase += f.vphase * dt;
+        f.rot += f.vr * dt;
+        if (f.y - f.d > ART_H) respawn(f);
+        place(f);
+      }
     });
   }
 
-  global.Scenery = { snowfall: snowfall, titleFlakes: titleFlakes, flakeSvg: flakeSvg, FLAKE_D: FLAKE_D };
+  global.Scenery = { snowfall: snowfall, welcomeSnow: welcomeSnow, flakeSvg: flakeSvg, FLAKE_D: FLAKE_D };
 })(window);

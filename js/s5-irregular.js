@@ -98,9 +98,7 @@
   function sceneIrregular() {
     var g = S.el('g');
     var shape = null, card = null, card2 = null, sum = null;
-    return K.wipeBoard()
-      .then(function () { return K.say('i0Intro'); })
-      .then(function () { return Flow.wait(BEAT); })
+    return K.interlude(['i0Intro'])
       .then(function () {
         group.removeAttribute('hidden');
         group.appendChild(g);
@@ -149,34 +147,43 @@
       .then(function () { return K.speakBySentence('i1Look'); })
       .then(function () { return K.handOver(); })
 
-      /* ---- the question ---------------------------------------------------- */
-      .then(function () { return K.say('i2Ask'); })
-      .then(function () { return K.offerChoices([28, 30, 26, 35].map(cm)); })
-      .then(function (btns) {
-        return K.askUntilRight(btns, 1, {
-          onWrong: function (k) { return K.speakBySentence({ 0: 'i2Wrong28', 2: 'i2Wrong26', 3: 'i2Wrong35' }[k] || 'bWrongGeneric', 'confused'); }
-        });
-      })
-      .then(function () { return Flow.anim(Beats.cardOut(card2)); })
+      /* ---- the question, asked from beside the shape ------------------------
+         As every question with answers to tap is: the header shut, the bird
+         up on the right with the question in its bubble, three answers
+         under it, every verdict in the same bubble; a right answer makes
+         way for the working ("Perimeter:" over the sum) as the light walks
+         the boundary. */
+      .then(function () { return Promise.all([K.birdAway(), Flow.anim(Beats.cardOut(card2))]); })
       .then(function () {
         if (card2.parentNode) card2.parentNode.removeChild(card2);
         layerNodes = layerNodes.filter(function (n) { return n !== card2; });
-        sum = W.sumCard(dom.layer, { title: T('lblPerimeter'), style: CARD_AT });
-        layerNodes.push(sum.el);
-        return Flow.anim(Beats.cardIn(sum.el));
+        return Flow.anim(K.collapseHeader(true));
+      })
+      .then(function () { return K.perchSay('i2Ask'); })
+      .then(function () { return K.perchChoices([28, 30, 26].map(cm)); })
+      .then(function (btns) {
+        return K.askUntilRight(btns, 1, {
+          onWrong: function (k) { return K.perchSay({ 0: 'i2Wrong28', 2: 'i2Wrong26' }[k] || 'bWrongGeneric', 'confused', 'no'); }
+        });
       })
       .then(function () {
-        return Flow.anim(Beats.walk(shape, 3.2, {
-          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); sum.term(String(SUM[k]), k); }
-        }));
+        var told = K.perchSay('i2Right', 'happy', 'yes');
+        var work = Flow.wait(BEAT)
+          .then(function () { return K.perchClear(); })
+          .then(function () {
+            sum = K.perchSum(T('lblPerimeterIs'), { terms: SUM, total: '= ' + cm(30) });
+            return Flow.anim(Beats.cardIn(sum.el));
+          })
+          .then(function () {
+            return Flow.anim(Beats.walk(shape, 3.2, {
+              onSide: function (k) { Beats.lightSide(shape, k, { label: true }); sum.term(String(SUM[k]), shape.ink(k)); }
+            }));
+          })
+          .then(function () { return sum.total('= ' + cm(30)); })
+          .then(function () { var c = shape.centre(); K.burstAt(c.x, c.y); });
+        return Promise.all([told, work]);
       })
-      .then(function () { return sum.result('= ' + cm(30)); })
-      .then(function () {
-        var c = shape.centre(); K.burstAt(c.x, c.y);
-        return K.speakBySentence('i2Right', 'happy');
-      })
-      .then(function () { return K.handOver(); })
-      .then(function () { return K.clearChoices(); });
+      .then(function () { return K.handOver(); });
   }
 
   function parts() { return [group]; }

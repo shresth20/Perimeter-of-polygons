@@ -1,6 +1,6 @@
 /* ==========================================================================
    Perimeter of Polygons -- base layer: the ice theme
-   A frozen lake (assets/images/bg.jpg) with a frosted-ice board floating on
+   A frozen lake (assets/images/bg.png) with a frosted-ice board floating on
    it, Swiftee on the header, snow drifting behind. Every colour below is a
    token; no scene writes a raw hex value.
    ========================================================================== */
@@ -70,7 +70,8 @@
   --shape-fill:      color-mix(in srgb, var(--ice-3) 42%, var(--snow));
   --shape-fill-deep: color-mix(in srgb, var(--ice-deep) 38%, var(--snow));
   --shape-line:      var(--ink);
-  --area-wash:       color-mix(in srgb, var(--ice-deep) 55%, var(--snow));
+  --area-wash:       var(--ice-ink);   /* the lit inside: darker than its rim  */
+  --area-rim:        var(--ice-3);     /* the lit inside's outline, kept light */
   --perim-glow:      var(--gold);
 
   /* ---- surfaces --------------------------------------------------------- */
@@ -118,7 +119,7 @@
   --font-display: "Lilita One", "Baloo 2", system-ui, sans-serif;
   --font-body: "Baloo 2", system-ui, sans-serif;
 
-  --art-page: url("../assets/images/bg.jpg");
+  --art-page: url("../assets/images/bg.png");
   /* The welcome's painting (title and bird drawn in): welcome.png as a jpg.
      js/scenery.js lets snowflakes fall over it. */
   --art-welcome: url("../assets/images/welcome-bg.jpg");
@@ -488,7 +489,11 @@ body {
 .slot { position: absolute; pointer-events: none; }
 .slot--hero {
   z-index: var(--z-hero);
-  left: 24%;
+  /* Bird + bubble read as one group centred on the frame: the bird sits left
+     of centre, the bubble runs right of it. pages.js (centreHero) rewrites
+     `left` for the widest line each time the bird takes centre stage; this
+     is the fallback, tuned for "Let's have a quick warm up." */
+  left: 37%;
   bottom: 8%;
   height: 44%;
   aspect-ratio: 1;
@@ -562,6 +567,67 @@ body {
   opacity: .9;
 }
 .bubble .type-wrap { display: inline-block; vertical-align: top; }
+
+/* ---- The bird beside the shape (pages.js: the perch) ----------------------
+   The right half of the stage, over the figure: the bird's spot, the bubble
+   over its head (the centre-stage bubble, stamped again, so its tail lands
+   on the head exactly as it does there), and under its feet a row for the
+   answers -- and, once one is right, the working. Every height is a share
+   of the stage, and none of them depends on what is in the bubble or the
+   row, so nothing under the bird moves when a line or a verdict changes. */
+.layer > .perch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding-top: 7%;
+  pointer-events: none;
+}
+.perch__stand {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-left: 12%;
+  height: 40%;
+  aspect-ratio: 1;
+}
+.perch__answers {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 20%;
+  margin-top: 1.5%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(12px, 5%, 40px);
+  pointer-events: auto;
+}
+/* Beside the shape the bubble is a step smaller than centre stage, and it
+   wraps (rather than running off the board) at the width the panel leaves
+   it. A verdict tints it, rim, face and tail together: the tail reads the
+   same --note-edge and --bubble-bg. */
+.bubble.bubble--perch {
+  font-size: clamp(14px, calc(var(--board-w) * .021), 34px);
+  max-width: calc(var(--board-w) * .34);
+  transition: background-color .25s ease, border-color .25s ease;
+}
+.bubble--perch .type,
+.bubble--perch .type-ghost { white-space: pre-wrap; }
+.bubble--perch.is-yes {
+  --note-edge: var(--right-border);
+  --bubble-bg: color-mix(in srgb, var(--right-fill) 24%, var(--snow));
+}
+.bubble--perch.is-no {
+  --note-edge: var(--wrong-border);
+  --bubble-bg: color-mix(in srgb, var(--wrong-fill) 22%, var(--snow));
+}
+.bubble--perch.is-yes::before { background: color-mix(in srgb, var(--right-fill) 45%, var(--snow)); }
+.bubble--perch.is-no::before { background: color-mix(in srgb, var(--wrong-fill) 40%, var(--snow)); }
 .bubble-tail {
   position: absolute;
   left: var(--bub-tail-x);

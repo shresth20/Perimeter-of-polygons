@@ -80,24 +80,27 @@
   }
 
   /* ---- a side panel, for the swipe sort -----------------------------------
-     z: { name, side: 'left'|'right', x, y, w, h, cap }. A tall frosted panel
-     with its name on a band at the top and a shelf below, where the cards
-     swiped into it are kept, small, in a row. `cap` is how many it will
-     hold (the seats are laid out for that many). */
+     z: { name, side: 'left'|'right', x, y, w, h, m, cap, depth }. A tall
+     frosted panel with its name on a band at the top and a shelf below,
+     where the cards swiped into it are kept, small, in a row. `cap` is how
+     many it will hold (the seats are laid out for that many); `m` is its
+     gap from the figure's edge; `depth: false` leaves off the slab under it. */
   var ZONE_W = 240, ZONE_H = 300, ZONE_Y = 58, ZONE_M = 26;
   function buildZone(group, z) {
     var w = z.w || ZONE_W, hh = z.h || ZONE_H, y = z.y == null ? ZONE_Y : z.y;
-    var x = z.x != null ? z.x : (z.side === 'right' ? VB_W - ZONE_M - w : ZONE_M);
+    var m = z.m == null ? ZONE_M : z.m;
+    var x = z.x != null ? z.x : (z.side === 'right' ? VB_W - m - w : m);
     var g = el('g', { 'class': 'zone zone--' + (z.side || 'left'), 'data-name': z.name, tabindex: 0, role: 'button' });
     g.setAttribute('aria-label', T('a11yZone', { name: T(z.name) }));
-    var shadow = el('rect', { 'class': 'zone__shadow', x: x, y: y + 8, width: w, height: hh, rx: 28 });
+    var shadow = z.depth === false ? null
+      : el('rect', { 'class': 'zone__shadow', x: x, y: y + 8, width: w, height: hh, rx: 28 });
     var body = el('rect', { 'class': 'zone__body', x: x, y: y, width: w, height: hh, rx: 28 });
     var band = el('rect', { 'class': 'zone__band', x: x + 16, y: y + 16, width: w - 32, height: 58, rx: 18 });
     var label = el('text', { 'class': 'figure-label zone__label', x: x + w / 2, y: y + 46, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
     label.textContent = T(z.name);
     var shelf = { x: x + 14, y: y + 88, w: w - 28, h: hh - 102 };
     var tray = el('rect', { 'class': 'zone__shelf', x: shelf.x, y: shelf.y, width: shelf.w, height: shelf.h, rx: 18 });
-    [shadow, body, band, label, tray].forEach(function (n) { g.appendChild(n); });
+    [shadow, body, band, label, tray].forEach(function (n) { if (n) g.appendChild(n); });
     group.appendChild(g);
     var cap = Math.max(1, z.cap || 3), cols = Math.min(2, cap), rows = Math.ceil(cap / cols);
     var zone = {
@@ -391,7 +394,7 @@
   function mascotJumpIn(slot) {
     var e = mascot.el;
     slot = slot || dom.slotHeader;
-    if (slot === dom.slotHeader) Flow.anim(openHeader());
+    if (slot === dom.slotHeader) quiet(Flow.anim(openHeader()));
     e.classList.add('is-away');
     e.hidden = false;
     mascot.placeIn(slot);
@@ -417,7 +420,7 @@
     if (e.hidden || e.classList.contains('is-away')) return Promise.resolve();
     if (e.parentNode === dom.slotHero && !dom.board.classList.contains('show')) return Promise.resolve();
     var closes = e.parentNode === dom.slotHeader && !keep;
-    var shut = function () { if (closes) Flow.anim(collapseHeader(true)); };
+    var shut = function () { if (closes) quiet(Flow.anim(collapseHeader(true))); };
     var cell = e.getBoundingClientRect();
     if (!cell.width || M.reducedMotion()) { e.classList.add('is-away'); shut(); return Promise.resolve(); }
     var plan = flightPlan(cell);
@@ -455,6 +458,8 @@
   /* Say a line: a key, or a { text, vo } line. */
   function say(key, mood, along) {
     var line = typeof key === 'string' ? keyed(key) : lineOf(key);
+    /* the bird on its perch says everything in the perch's bubble */
+    if (perch && perch.open) return perchLine(line, mood);
     var parts = sentencesOf(line.text);
     if (!parts) return sayOne(line, mood, along);
     parts = parts.map(function (s) { return s.trim(); });
@@ -589,6 +594,157 @@
     return e.parentNode === dom.slotHeader && !e.hidden && !e.classList.contains('is-away');
   }
 
+  /* ======================================================================
+   * The bird beside the shape -- the perch
+   * ----------------------------------------------------------------------
+   * A question asked beside the figure rather than from the header: the
+   * shape stands on the left of the board, and on the right the bird has a
+   * spot of its own, with a bubble over its head and a row under its feet
+   * for the answers (and, once answered, for the working). While the perch
+   * is up, the question and every verdict on it are said in that bubble and
+   * the header stays shut. The bird jumps onto it the way it jumps onto the
+   * header: up from behind the board and down onto its spot.
+   * ====================================================================== */
+  var perch = null;
+  var SENTENCE_HOLD = 560;   /* ms a sentence is held before the next replaces it */
+
+  function div(cls, parent) {
+    var e = document.createElement('div');
+    e.className = cls;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function perchBuild() {
+    var root = div('perch', dom.layer);
+    var stand = div('perch__stand', root);
+    /* the centre-stage bubble (index.html) stamped again, so the bird's box
+       is the same object wherever it speaks */
+    var bubble = dom.bubble.cloneNode(true);
+    bubble.removeAttribute('id');
+    bubble.removeAttribute('style');
+    Array.prototype.forEach.call(bubble.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+    bubble.querySelector('.type-wrap').removeAttribute('style');
+    bubble.querySelector('.type-ghost').textContent = '';
+    bubble.querySelector('.type .txt').textContent = '';
+    bubble.classList.add('bubble--perch');
+    bubble.setAttribute('hidden', '');
+    stand.appendChild(bubble);
+    var answers = div('perch__answers', root);
+    answers.setAttribute('role', 'group');
+    answers.setAttribute('aria-label', T('a11yAnswers'));
+    var typer = global.Typer.create(bubble.querySelector('.type-wrap'), { box: bubble, fit: true });
+    return { root: root, stand: stand, bubble: bubble, answers: answers, say: onVoice(typer), open: false, shown: false };
+  }
+  /* The header emptied and shut, then the bird up onto its spot. */
+  function perchOpen(P) {
+    var away = birdOnHeader() || dom.promptLine.textContent.trim() ? birdAway() : Promise.resolve();
+    return away
+      .then(function () { return Flow.anim(collapseHeader(true)); })
+      .then(function () { return mascotJumpIn(P.stand); })
+      .then(function () { Beats.bubbleArm(P.bubble); P.open = true; });
+  }
+  function tint(P, verdict) {
+    P.bubble.classList.toggle('is-yes', verdict === 'yes');
+    P.bubble.classList.toggle('is-no', verdict === 'no');
+  }
+  /* A line in the perch's bubble (the perch made, and the bird brought up,
+     if they are not yet): a key or a { text, vo } line, shown a sentence at
+     a time -- each replacing the one before, as on the header -- with its
+     recording under it. `verdict` ('yes' | 'no') tints the bubble green or
+     red for an answer's feedback; none puts it back to white. A newer line
+     cuts an older one off. */
+  function perchLine(text, mood, verdict) {
+    var P = perch || (perch = perchBuild());
+    var line = typeof text === 'string' ? keyed(text) : lineOf(text);
+    var mine = ++speaking;
+    var parts = sentencesOf(line.text);
+    parts = parts ? parts.map(function (s) { return s.trim(); }) : [line.text];
+    var fast = Flow.isFast();
+    if (fast) parts = parts.slice(-1);
+    var cues = fast ? null : cuesFor(line.text, line.vo);
+    var up = P.open ? Promise.resolve() : perchOpen(P);
+    return up.then(function () {
+      if (mine !== speaking || perch !== P) return;
+      tint(P, verdict);
+      mascot.state(mood || 'talking');
+      var t0 = performance.now();
+      began(line.text);
+      var heard = fast ? null : quiet(voiceOf(line));
+      var w = 0;
+      var typed = parts.reduce(function (chain, s, i) {
+        var n = (s.match(/\S+\s*/g) || []).length;
+        var at = cues ? cues.slice(w, w + n) : null;
+        w += n;
+        return chain.then(function () {
+          if (mine !== speaking || perch !== P) return;
+          var hold = !i ? null : Flow.wait(at ? t0 + at[0] - performance.now() : SENTENCE_HOLD);
+          return Promise.resolve(hold).then(function () {
+            if (mine !== speaking || perch !== P) return;
+            var late = performance.now() - t0;
+            var said = P.say(s, at ? { at: at.map(function (c) { return Math.max(0, c - late); }) } : undefined);
+            if (!P.shown) { P.shown = true; quiet(Flow.anim(Beats.bubbleIn(P.bubble))); }
+            return said;
+          });
+        });
+      }, Promise.resolve());
+      return Promise.all([typed, heard]);
+    }).then(function () { if (mine === speaking) mascot.settle(); });
+  }
+  /* A line heard and not written ("Tap the correct answer."), in the
+     background: nothing waits on it, the bubble keeps the question, and the
+     bird talks for as long as it lasts -- unless a newer line has the bird
+     by then. */
+  function perchVoice(key) {
+    if (Flow.isFast() || !global.I18n) return Promise.resolve();
+    var mine = speaking;
+    mascot.state('talking');
+    return quiet(voiceOver(key).then(function () { if (mine === speaking) mascot.settle(); }));
+  }
+  /* The answers, in a row under the bird. */
+  function perchChoices(labels) {
+    var P = perch || (perch = perchBuild());
+    var btns = buildChoices(P.answers, labels);
+    return Flow.anim(Beats.trayIn(P.answers, btns)).then(function () { return btns; });
+  }
+  /* Whatever is under the bird -- the answers -- taken away. */
+  function perchClear() {
+    var P = perch;
+    if (!P) return Promise.resolve();
+    var kids = Array.prototype.slice.call(P.answers.children);
+    return Flow.anim(Beats.cardOut(kids)).then(function () { P.answers.textContent = ''; });
+  }
+  /* A sum card under the bird, where the answers stood (W.sumCard);
+     `reserve` ({ terms, total }) sizes it for the finished sum up front. */
+  function perchSum(title, reserve) {
+    var P = perch || (perch = perchBuild());
+    var long = reserve && reserve.terms && reserve.terms.length > 5;
+    return W.sumCard(P.answers, { title: title, cls: 'card--perch' + (long ? ' card--long' : ''), reserve: reserve });
+  }
+  /* The perch taken down: the bubble shuts, the bird jumps away behind the
+     board, the row under it goes. */
+  function perchDown() {
+    var P = perch;
+    if (!P) return Promise.resolve();
+    speaking++;
+    var shut = P.bubble.hasAttribute('hidden') ? Promise.resolve() : Flow.anim(Beats.bubbleOut(P.bubble));
+    var bird = mascot.el.parentNode === P.stand ? mascotJumpOut() : Promise.resolve();
+    var rest = Flow.anim(Beats.cardOut(Array.prototype.slice.call(P.answers.children)));
+    return Promise.all([shut, bird, rest]).then(function () { if (perch === P) perchReset(); });
+  }
+  /* ...and at once, for a replay or a jump. The bird is never left inside
+     the panel that is being thrown away. */
+  function perchReset() {
+    var P = perch;
+    perch = null;
+    if (!P) return;
+    if (mascot.el.parentNode === P.stand) {
+      mascot.el.classList.add('is-away');
+      mascot.placeIn(dom.slotHero);
+    }
+    P.say.clear();
+    if (P.root.parentNode) P.root.parentNode.removeChild(P.root);
+  }
+
   /* ---- praise ------------------------------------------------------------- */
   var PRAISE = ['praiseWellDone', 'praiseExcellent', 'praiseAwesome', 'praiseFantastic', 'praisePerfect'];
   var praised = 0;
@@ -648,7 +804,8 @@
 
   /* ---- a scene, over ------------------------------------------------------- */
   function wipeBoard() {
-    var gone = mascotJumpOut();
+    /* a bird on its perch goes with the perch */
+    var gone = perch ? perchDown() : mascotJumpOut();
     var shut = Flow.anim(Beats.bubbleOut(dom.bubble));
     var line = Flow.anim(Beats.lineOut(dom.promptLine));
     var figure = Flow.anim(Beats.clearFigure(figureParts().filter(function (g) { return !g.hasAttribute || !g.hasAttribute('hidden'); })));
@@ -909,6 +1066,7 @@
     function sorted(z) {
       live = false; busy = true;
       g.classList.remove('is-live', 'is-lifted');
+      g.classList.add('is-kept');   /* sorted: its highlight stops glowing */
       var seat = z.seat(z.kept.length);
       z.kept.push(card);
       Beats.zoneRight(z);
@@ -1059,7 +1217,11 @@
     mascot.state('waving');
     return Flow.wait(SHORT)
       .then(function () { return Flow.anim(global.Loader ? global.Loader.ready() : null); })
-      .then(function () { dom.startBtn.removeAttribute('hidden'); return Flow.frame(); })
+      .then(function () {
+        centreHero([keyed('p01Hey'), keyed('p02Warm')]);
+        dom.startBtn.removeAttribute('hidden');
+        return Flow.frame();
+      })
       .then(function () {
         dom.startBtn.classList.add('in');
         M.button3d(dom.startBtn, { edge: 5 });
@@ -1090,10 +1252,88 @@
       .then(function () { return handOver(dom.nextBtn); });
   }
 
-  /* The board opened over the bird: the bubble goes, the board grows in. */
+  /* ---- the bird centre stage ----------------------------------------------
+     The bird and its bubble read as ONE group, centred on the frame. The
+     bubble's width differs line to line (it morphs between them), so the
+     group is centred on the WIDEST line it will say, measured up front --
+     the bird then stands still while the bubble changes under it. Set while
+     nothing is on show (behind the welcome, or behind the board). */
+  var BIRD_INSET = 0.13;   /* the bird's painted left edge, as a share of its slot */
+  function centreHero(lines) {
+    var slot = dom.slotHero;
+    var fw = dom.frame.getBoundingClientRect().width;
+    var sw = slot.offsetWidth;
+    if (!fw || !sw) return;
+    var probe = dom.bubble.cloneNode(true);
+    probe.removeAttribute('id');
+    probe.removeAttribute('hidden');
+    probe.removeAttribute('style');
+    probe.setAttribute('aria-hidden', 'true');
+    Array.prototype.forEach.call(probe.querySelectorAll('[id]'), function (n) { n.removeAttribute('id'); });
+    var ghost = probe.querySelector('.type-ghost');
+    var txt = probe.querySelector('.type .txt');
+    if (txt) txt.textContent = '';
+    probe.style.visibility = 'hidden';
+    slot.appendChild(probe);
+    var widest = 0, offL = 0;
+    lines.forEach(function (line) {
+      if (ghost) ghost.textContent = plain(line.text);
+      widest = Math.max(widest, probe.offsetWidth);
+      offL = probe.offsetLeft;
+    });
+    slot.removeChild(probe);
+    /* the group's middle, from the slot's left edge */
+    var mid = (BIRD_INSET * sw + offL + widest) / 2;
+    slot.style.left = ((fw / 2 - mid + sw / 2) / fw * 100) + '%';
+  }
+
+  /* An interlude between sections, as at the welcome: the board is cleared
+     and closed, the bird is left standing centre stage (it stands behind the
+     board, so the board's fade uncovers it), says its lines in the bubble,
+     hands over to Next, and the board opens again. */
+  function interlude(keys) {
+    var e = mascot.el;
+    var lines = keys.map(function (k) { return keyed(k); });
+    return wipeBoard()
+      .then(function () {
+        mascot.placeIn(dom.slotHero);
+        centreHero(lines);
+        M.set(e, { clearProps: 'transform' });
+        e.hidden = false;
+        e.classList.remove('is-away');
+        mascot.idle();
+        if (!dom.board.classList.contains('show')) return null;
+        return Flow.anim(Beats.boardOut(dom.board));
+      })
+      .then(function () { return Flow.wait(SHORT); })
+      .then(function () {
+        return lines.reduce(function (chain, line, i) {
+          return chain
+            .then(function () { return i ? Flow.wait(BEAT) : null; })
+            .then(function () {
+              mascot.state('talking');
+              if (!i) Beats.bubbleArm(dom.bubble);
+              var heard = quiet(voiceOf(line));
+              var said = sayBubble(line);
+              if (!i) Beats.bubbleIn(dom.bubble);
+              return Promise.all([said, heard]);
+            });
+        }, Promise.resolve());
+      })
+      .then(function () { mascot.settle(); return Flow.wait(SHORT); })
+      .then(function () { return handOver(); })
+      .then(openBoard);
+  }
+
+  /* The board opened: the bird and its bubble leave centre stage first (so
+     the bird is never left standing behind the board), then the board grows
+     in. */
   function openBoard() {
     if (dom.board.classList.contains('show')) return Promise.resolve();
-    return Flow.anim(Beats.bubbleOut(dom.bubble))
+    var e = mascot.el;
+    var bird = e.parentNode === dom.slotHero && !e.hidden && !e.classList.contains('is-away')
+      ? Flow.anim(Beats.heroOut(e)) : Promise.resolve();
+    return Promise.all([Flow.anim(Beats.bubbleOut(dom.bubble)), bird])
       .then(function () { sayBubble.clear(); return Flow.anim(Beats.boardIn(dom.board)); })
       .then(function () { return Flow.wait(SHORT); });
   }
@@ -1172,6 +1412,7 @@
     begun = { text: null, at: 0 };
     if (global.I18n) global.I18n.stop();
     hopperOff();
+    perchReset();
     mascot.el.hidden = false;
     mascot.el.classList.remove('is-away');
     mascot.idle();
@@ -1250,7 +1491,7 @@
     choices: function (list) { if (list) choiceBtns = list; return choiceBtns; },
     offerChoices: offerChoices, clearChoices: clearChoices,
     handOver: handOver, autoTurn: autoTurn,
-    openBoard: openBoard, wipeBoard: wipeBoard, collapseHeader: collapseHeader, openHeader: openHeader,
+    openBoard: openBoard, wipeBoard: wipeBoard, interlude: interlude, collapseHeader: collapseHeader, openHeader: openHeader,
     say: say, speak: speakLine, arriveSaying: speakLine, speakBySentence: speakBySentence,
     keyed: keyed, hear: hear, voiceOver: voiceOver, birdVoice: birdVoice, typedFor: typedFor,
     onWord: onWord, onPhrase: onPhrase,
@@ -1258,6 +1499,8 @@
     mascotJumpIn: mascotJumpIn, mascotJumpOut: mascotJumpOut,
     celebrate: celebrate, praise: praise, burstAt: burstAt,
     askChoice: askChoice, askUntilRight: askUntilRight,
+    perchSay: perchLine, perchVoice: perchVoice, perchChoices: perchChoices,
+    perchClear: perchClear, perchSum: perchSum, perchDown: perchDown,
     armQuiz: armQuiz, armSwipe: armSwipe, armTapSides: armTapSides,
     dragGuide: function (to) { return W.dragGuide(dom.tray, to); },
     ripple: ripple, quiet: quiet, clearInline: clearInline

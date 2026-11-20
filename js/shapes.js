@@ -71,9 +71,64 @@
     return { x: round2((a.x + b.x) / 2 + n.x * off), y: round2((a.y + b.y) / 2 + n.y * off) };
   }
 
+  /* ---- one ink per length --------------------------------------------------
+     Sides of the same length wear the same ink, everywhere in the game: a
+     rectangle is two inks (its lengths, its breadths), a square or any
+     regular polygon is one, a scalene triangle three. Two sides are "the
+     same length" when they carry the same label (8 cm and 8 cm, a and a)
+     or, with no label, when they measure within LEN_SLACK of each other.
+     The inks are kept stable while a shape changes under the finger: a
+     length already showing keeps its ink, and a new one takes the first
+     ink no showing length is using. */
+  var LEN_SLACK = 1.5;
+  function inkKeys(s) {
+    var keys = [], lens = [];
+    for (var i = 0; i < s.n; i++) {
+      var lab = s.opts.labels != null ? String(s.labelText(i)) : '';
+      if (lab) { keys.push('l:' + lab); continue; }
+      var L = s.len(i), k = -1;
+      for (var j = 0; j < lens.length; j++) if (Math.abs(lens[j] - L) <= LEN_SLACK) { k = j; break; }
+      if (k < 0) { lens.push(L); k = lens.length - 1; }
+      keys.push('n:' + k);
+    }
+    return keys;
+  }
+  function assignInks(s) {
+    var o = s.opts;
+    if (Array.isArray(o.inks)) return s.pts.map(function (p, i) { return o.inks[i % o.inks.length]; });
+    if (o.inks !== true) return s.pts.map(function () { return null; });
+    var keys = inkKeys(s), map = s.inkMap || {}, kept = {}, used = {};
+    keys.forEach(function (k) { if (map[k] != null) { kept[k] = map[k]; used[map[k]] = true; } });
+    var base = o.inkFrom || 0, next = 0;
+    keys.forEach(function (k) {
+      if (kept[k] != null) return;
+      while (used[(base + next) % SIDE_INKS] && next < SIDE_INKS) next++;
+      kept[k] = (base + next) % SIDE_INKS;
+      used[kept[k]] = true;
+    });
+    s.inkMap = kept;
+    return keys.map(function (k) { return kept[k]; });
+  }
+  function paintInks(s) {
+    var inks = assignInks(s);
+    for (var i = 0; i < s.n; i++) {
+      var ink = inks[i];
+      if (ink === s.inks[i]) continue;
+      s.inks[i] = ink;
+      [s.sides[i], s.labels[i]].forEach(function (e) {
+        if (!e) return;
+        if (ink == null) e.style.removeProperty('--c');
+        else e.style.setProperty('--c', 'var(--side-' + ink + ')');
+      });
+    }
+  }
+
   /* opts:
-       inks     true: each side in its own ink (--side-i); a list of ink
-                indices to use one per side; false: the shape's one line
+       inks     true: one ink per side LENGTH (--side-i; equal sides share
+                one, see above); a list of ink indices to use one per side;
+                false: the shape's one line
+       inkFrom  with inks true, the ink the first length takes (default 0),
+                so shapes side by side can each wear their own
        labels   one string per side, or a function(i, len) -> string, or
                 null for none
        offset   how far outside the side its label sits (default 26)
@@ -91,7 +146,7 @@
       fill: el('path', { 'class': 'shape__fill' }),
       area: o.area ? el('path', { 'class': 'shape__area' }) : null,
       perim: o.perim ? el('path', { 'class': 'shape__perim' }) : null,
-      sides: [], hits: [], labels: [], vertices: [], vhits: [],
+      sides: [], hits: [], labels: [], vertices: [], vhits: [], inks: [], inkMap: null,
       outline: el('path', { 'class': 'shape__outline' }),
       tip: el('circle', { 'class': 'shape__tip', r: 7 }),
       hitbox: o.hitbox ? el('path', { 'class': 'shape__hitbox' }) : null,
@@ -102,8 +157,6 @@
     g.appendChild(s.outline);
     for (var i = 0; i < n; i++) {
       var side = el('path', { 'class': 'shape__side' });
-      var ink = o.inks === true ? i % SIDE_INKS : (Array.isArray(o.inks) ? o.inks[i % o.inks.length] : null);
-      if (ink != null) side.style.setProperty('--c', 'var(--side-' + ink + ')');
       g.appendChild(side);
       s.sides.push(side);
     }
@@ -119,8 +172,6 @@
     if (o.labels != null) {
       for (i = 0; i < n; i++) {
         var t = el('text', { 'class': 'figure-label shape__label', 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
-        var ink2 = o.inks === true ? i % SIDE_INKS : (Array.isArray(o.inks) ? o.inks[i % o.inks.length] : null);
-        if (ink2 != null) t.style.setProperty('--c', 'var(--side-' + ink2 + ')');
         g.appendChild(t);
         s.labels.push(t);
       }
@@ -184,7 +235,11 @@
         s.name.setAttribute('x', c.x);
         s.name.setAttribute('y', low + (o.nameGap == null ? 40 : o.nameGap));
       }
+      paintInks(s);
     };
+    /* The ink side i wears (an index into --side-0..7), for the working that
+       writes its length in the same colour; null for a one-line shape. */
+    s.ink = function (i) { return s.inks[i] == null ? null : s.inks[i]; };
     s.set(pts);
     /* Every mark in the group, for a wipe to fade. */
     s.parts = function () { return [g]; };

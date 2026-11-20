@@ -39,6 +39,7 @@ window.GAME_LOCALES={
     "unitCm": "cm",
     "lblCm": "{n} cm",
     "lblPerimeter": "Perimeter",
+    "lblPerimeterIs": "Perimeter:",
     "lblArea": "Area",
     "lblSide": "side",
     "lblSides": "{n} sides",

@@ -111,20 +111,49 @@
    * Shapes
    * ====================================================================== */
 
-  /* The shape made by a pen: a dot lands on the first corner and the sides
-     are drawn one after another, each in its own ink, the dot riding the
-     tip; then the colour is poured in. `seconds` is the whole outline's
-     time, shared out by length. */
+  /* The shape made by a pen: a dot lands on the first corner and runs once
+     round the outline, each side drawn in its own ink behind it; then the
+     colour is poured in. ONE eased stroke for the whole outline -- the pen
+     gathers speed off the first corner and settles into the last -- rather
+     than a stop and start at every corner. `seconds` is the outline's time;
+     `o.ease` the pen's (default sine.inOut). Each corner pops as it is
+     reached. Every length is measured before the pen moves. */
   function drawShape(shape, opts) {
     var o = opts || {};
     var seconds = o.time || 1.6;
     var pts = shape.pts, n = shape.n;
-    var total = 0, lens = [];
-    for (var i = 0; i < n; i++) { lens.push(shape.len(i)); total += lens[i]; }
+    var total = 0, lens = [], ends = [], dash = [];
+    for (var i = 0; i < n; i++) {
+      lens.push(shape.len(i));
+      total += lens[i];
+      ends.push(total);
+      dash.push(pathLength(shape.sides[i]) || lens[i] || 1);
+    }
     var START = 0.26;
     var tip = shape.tip;
     M.set(tip, { opacity: 1, scale: 0, x: 0, y: 0, transformOrigin: 'center center' });
     var x0 = pts[0].x, y0 = pts[0].y;
+    shape.sides.forEach(function (sd, k) {
+      sd.style.strokeDasharray = dash[k] + ' ' + dash[k];
+      sd.style.strokeDashoffset = dash[k];
+    });
+    M.set(shape.sides, { opacity: 1 });
+
+    var pen = { d: 0 }, corner = 0;
+    function draw() {
+      var d = pen.d;
+      for (var k = 0; k < n; k++) {
+        var from = ends[k] - lens[k];
+        var t = Math.max(0, Math.min(1, (d - from) / (lens[k] || 1)));
+        shape.sides[k].style.strokeDashoffset = dash[k] * (1 - t);
+      }
+      var j = 0;
+      while (j < n - 1 && d > ends[j]) j++;
+      var a = pts[j], b = pts[(j + 1) % n];
+      var f = Math.max(0, Math.min(1, (d - (ends[j] - lens[j])) / (lens[j] || 1)));
+      M.set(tip, { x: a.x + (b.x - a.x) * f - x0, y: a.y + (b.y - a.y) * f - y0 });
+      while (corner < n && d >= ends[corner] - 0.5) { corner++; pop(); }
+    }
 
     var tl = M.timeline({
       revert: function () {
@@ -134,28 +163,22 @@
     });
     tl.to(tip, { scale: 1, duration: M.dur(0.24), ease: M.POP }, 0);
     tl.call(pop, null, 0);
-    var at = START;
-    for (i = 0; i < n; i++) {
-      var secs = Math.max(0.12, seconds * lens[i] / (total || 1));
-      M.set(shape.sides[i], { opacity: 1 });
-      stroke(tl, shape.sides[i], at, secs, 'none');
-      var b = pts[(i + 1) % n];
-      tl.to(tip, { x: b.x - x0, y: b.y - y0, duration: M.dur(secs), ease: 'none' }, M.gap(at));
-      tl.call(pop, null, M.gap(at + secs));
-      at += secs;
-    }
-    tl.to(tip, { scale: 0, opacity: 0, duration: M.dur(0.22), ease: 'power2.in' }, M.gap(at));
-    if (o.fill !== false) tl.add(fillShape(shape, o.deep), M.gap(at + 0.05));
+    tl.to(pen, { d: total, duration: M.dur(seconds), ease: o.ease || 'sine.inOut', onUpdate: draw }, M.gap(START));
+    tl.to(tip, { scale: 0, opacity: 0, duration: M.dur(0.22), ease: 'power2.in' }, M.gap(START + seconds));
+    if (o.fill !== false) tl.add(fillShape(shape, o.deep), M.gap(START + seconds + 0.05));
     return tl;
   }
 
-  /* The colour poured in, growing from just inside the outline. */
+  /* The colour poured in, growing from just inside the outline -- about the
+     shape's own middle: svgOrigin is in the figure's units, where a px
+     transformOrigin would be read from the fill's bounding box and grow it
+     from off to one side. */
   function fillShape(shape, deep) {
     var c = shape.centre();
     if (deep) shape.fill.classList.add('is-deep');
     var tl = M.timeline({ willChange: shape.fill, willChangeValue: 'transform, opacity' });
     tl.fromTo(shape.fill,
-      { opacity: 0, scale: 0.82, transformOrigin: c.x + 'px ' + c.y + 'px' },
+      { opacity: 0, scale: 0.82, svgOrigin: c.x + ' ' + c.y },
       { opacity: 1, scale: 1, duration: M.dur(0.5), ease: 'power2.out' });
     return tl;
   }
@@ -727,6 +750,24 @@
     return tl;
   }
 
+  /* The bird leaving centre stage before the board opens: a crouch, then a
+     hop up and away as it fades. It ends hidden (.is-away), so nothing is
+     left standing behind the board. */
+  function heroOut(el) {
+    var lift = el.getBoundingClientRect().height * 0.16;
+    var tl = M.timeline({
+      willChange: el, willChangeValue: 'transform, opacity',
+      revert: function () {
+        el.classList.add('is-away');
+        M.set(el, { clearProps: 'opacity,transform,transformOrigin' });
+      }
+    });
+    M.set(el, { transformOrigin: '50% 100%' });
+    tl.to(el, { scaleX: 1.06, scaleY: 0.92, duration: M.dur(0.12), ease: 'power2.in' })
+      .to(el, { y: -lift, scaleX: 0.9, scaleY: 0.9, opacity: 0, duration: M.dur(0.32), ease: 'power2.in' });
+    return tl;
+  }
+
   function lineOut(line) {
     var tl = M.timeline({ willChange: line, willChangeValue: 'transform, opacity' });
     tl.to(line, { opacity: 0, y: -8, filter: 'blur(3px)', duration: M.dur(0.28), ease: 'power2.in' });
@@ -838,7 +879,7 @@
     lightsOn: lightsOn,
     clearFigure: clearFigure,
     bubbleArm: bubbleArm, bubbleIn: bubbleIn, bubbleOut: bubbleOut,
-    hopUp: hopUp, hopDown: hopDown, landOn: landOn, springOff: springOff,
+    hopUp: hopUp, hopDown: hopDown, landOn: landOn, springOff: springOff, heroOut: heroOut,
     lineOut: lineOut, controlIn: controlIn, controlOut: controlOut, welcomeOut: welcomeOut,
     confetti: confetti, confettiRain: confettiRain
   };

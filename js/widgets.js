@@ -313,7 +313,8 @@
      The working beside a shape: a title, the terms of the sum landing one
      by one -- each in its side's ink -- and the result under them.
        card.term(text, ink)   a term (and the + before it) in --side-ink
-       card.result(text)      "= 26 cm", in green
+       card.total(text)       "= 26 cm", in green, on the terms' own line
+       card.result(text)      "= 26 cm", in green, on a line of its own
        card.row(text, cls)    any other row */
   function sumCard(host, o) {
     o = o || {};
@@ -322,6 +323,18 @@
     if (o.title) { var t = h('p', 'card__title', card); t.textContent = o.title; }
     if (o.sub) { var sb = h('p', 'card__sub', card); sb.textContent = o.sub; }
     var terms = h('div', 'card__row card__row--terms', card);
+    /* o.reserve: { terms: [...], total }, the finished sum laid out unseen
+       under the live one, so the card is its final width from the start and
+       the terms land left to right in it rather than pushing it wider */
+    if (o.reserve) {
+      var ghost = h('div', 'card__row card__row--terms card__ghost', card);
+      ghost.setAttribute('aria-hidden', 'true');
+      o.reserve.terms.forEach(function (t, i) {
+        if (i) h('span', 'term is-op', ghost).textContent = '+';
+        global.MathText.write(h('span', 'term', ghost), String(t));
+      });
+      if (o.reserve.total) global.MathText.write(h('span', 'term is-total', ghost), o.reserve.total);
+    }
     var count = 0;
     var api = {
       el: card, terms: terms,
@@ -343,6 +356,12 @@
         count++;
         M.set(made, { opacity: 0 });
         return Flow.anim(Beats.termIn(made));
+      },
+      total: function (text) {
+        var e = h('span', 'term is-total', terms);
+        global.MathText.write(e, text);
+        M.set(e, { opacity: 0 });
+        return Flow.anim(Beats.termIn(e)).then(function () { return e; });
       },
       row: function (text, cls) {
         var r = h('div', 'card__row' + (cls ? ' ' + cls : ''), card);

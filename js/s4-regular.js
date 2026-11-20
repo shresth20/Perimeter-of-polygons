@@ -14,7 +14,11 @@
   function T(k, r) { return global.T ? global.T(k, r) : k; }
   var BEAT = K.BEAT, SHORT = K.SHORT, LOOK = K.LOOK;
   var NUDGE_AFTER = 2400;
-  var CARD_AT = { right: '4%', top: '12%', width: '42%' };
+  /* Pages 1-3: each shape is drawn big in the middle of the board, then glides
+     left to ASIDE_X, and the working is set plain on the ice to its right
+     (no card, no heading -- the bird has already said them). */
+  var MID_X = 500, ASIDE_X = 280;
+  var CARD_AT = { left: '52%', top: '36%' };
 
   var dom = null, group = null, layerNodes = [];
   function build(kit) { dom = kit.dom(); group = document.getElementById('figRegular'); }
@@ -25,6 +29,15 @@
     return e;
   }
   function aLabels(n) { var a = []; for (var i = 0; i < n; i++) a.push('a'); return a; }
+  /* the shape, drawn in the middle, carried aside to make room for the working */
+  function aside(g) {
+    return Flow.anim(Beats.moveGroup(g, { x: ASIDE_X - MID_X }, 0.9, 'power3.inOut'));
+  }
+  function sumCard() {
+    var card = W.sumCard(dom.layer, { cls: 'card--plain', style: CARD_AT });
+    layerNodes.push(card.el);
+    return card;
+  }
   function clearPage(g, cardEls) {
     return Promise.all([Flow.anim(Beats.cardOut(cardEls)), Flow.anim(Beats.clearFigure([g]))]).then(function () {
       cardEls.forEach(function (c) { if (c.parentNode) c.parentNode.removeChild(c); layerNodes = layerNodes.filter(function (n) { return n !== c; }); });
@@ -35,18 +48,17 @@
   /* ---- page 1: the triangle, tapped --------------------------------------- */
   function pageTriangle() {
     var g = S.el('g'); group.appendChild(g);
-    var shape = S.build(g, S.regular(3, 300, 220, 118), { inks: true, labels: aLabels(3), offset: 30, hits: true });
-    var card = W.sumCard(dom.layer, { title: T('lblAddSides'), style: CARD_AT });
-    layerNodes.push(card.el);
-    card.hint(T('lblTapBegin'));
+    var shape = S.build(g, S.regular(3, MID_X, 236, 162), { inks: true, labels: aLabels(3), offset: 34, hits: true, cls: 'shape--big' });
+    var card = sumCard();
     var stopHand = null, touched = false;
-    return Flow.anim(Beats.drawShape(shape, { time: 1.2 }))
+    return Flow.anim(Beats.drawShape(shape, { time: 1.4 }))
       .then(function () { return Flow.wait(SHORT); })
       .then(function () {
         K.onPhrase('r1Start', 'Let each side', function () { return Flow.anim(Beats.labelsIn(shape.labels)); });
         return K.speakBySentence('r1Start');
       })
       .then(function () { return Flow.wait(SHORT); })
+      .then(function () { return aside(g); })
       .then(function () { return Flow.anim(Beats.cardIn(card.el)); })
       .then(function () { return K.speakBySentence('r1Walk'); })
       .then(function () {
@@ -56,7 +68,7 @@
             touched = true;
             if (stopHand) { stopHand(); stopHand = null; }
             Beats.lightSide(shape, i, { label: true });
-            card.term('a', i);
+            card.term('a', shape.ink(i));
           }
         });
       })
@@ -64,7 +76,7 @@
       .then(function () { return card.result(T('lblEq3a')); })
       .then(function () { return card.row(T('lblEq3side'), 'is-soft').show(); })
       .then(function () {
-        var c = shape.centre(); K.burstAt(c.x, c.y);
+        var c = shape.centre(); K.burstAt(c.x + ASIDE_X - MID_X, c.y);
         return K.speakBySentence('r1Done', 'happy');
       })
       .then(function () { return K.handOver(); })
@@ -74,15 +86,16 @@
   /* ---- pages 2 and 3: the square and the pentagon, walked ------------------ */
   function pageWalked(o) {
     var g = S.el('g'); group.appendChild(g);
-    var shape = S.build(g, o.pts, { inks: true, labels: aLabels(o.pts.length), offset: 30 });
-    var card = W.sumCard(dom.layer, { title: T(o.title), sub: T(o.sub), style: CARD_AT });
-    layerNodes.push(card.el);
-    return Flow.anim(Beats.drawShape(shape, { time: 1.0 }))
+    var shape = S.build(g, o.pts, { inks: true, labels: aLabels(o.pts.length), offset: 34, cls: 'shape--big' });
+    var card = sumCard();
+    return Flow.anim(Beats.drawShape(shape, { time: 1.2 }))
       .then(function () { return Flow.anim(Beats.labelsIn(shape.labels)); })
+      .then(function () { return Flow.wait(SHORT); })
+      .then(function () { return aside(g); })
       .then(function () { return Flow.anim(Beats.cardIn(card.el)); })
       .then(function () {
         return Flow.anim(Beats.walk(shape, 2.2, {
-          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); card.term('a', k); }
+          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); card.term('a', shape.ink(k)); }
         }));
       })
       .then(function () { return card.result(T(o.eq)); })
@@ -136,7 +149,7 @@
         group.removeAttribute('hidden');
         return DRAG.reduce(function (chain, f) {
           return chain.then(function () {
-            var s = S.build(group, S.regular(f.n, f.cx, 138, 70), { inks: true, labels: aLabels(f.n), offset: 20, name: f.name, nameGap: 58 });
+            var s = S.build(group, S.regular(f.n, f.cx, 138, 70), { inks: true, inkFrom: shapes.length, labels: aLabels(f.n), offset: 20, name: f.name, nameGap: 58 });
             s.labels.forEach(function (l) { l.setAttribute('font-size', '20'); });
             shapes.push(s);
             return Flow.anim(Beats.drawShape(s, { time: 0.7 })).then(function () {
@@ -187,8 +200,8 @@
     return K.wipeBoard()
       .then(function () { group.removeAttribute('hidden'); })
       .then(pageTriangle)
-      .then(function () { return pageWalked({ pts: S.rect(215, 128, 160, 160), title: 'r2Title', sub: 'r2Sub', eq: 'r2Eq', rule: 'r2Rule', say: 'r2Say' }); })
-      .then(function () { return pageWalked({ pts: S.regular(5, 295, 212, 118), title: 'r3Title', sub: 'r3Sub', eq: 'r3Eq', rule: 'r3Rule', say: 'r3Say' }); })
+      .then(function () { return pageWalked({ pts: S.rect(MID_X - 115, 108, 230, 230), eq: 'r2Eq', rule: 'r2Rule', say: 'r2Say' }); })
+      .then(function () { return pageWalked({ pts: S.regular(5, MID_X, 226, 152), eq: 'r3Eq', rule: 'r3Rule', say: 'r3Say' }); })
       .then(pagePattern)
       .then(pageDrag);
   }

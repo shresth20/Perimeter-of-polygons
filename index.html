@@ -69,19 +69,6 @@
           <svg class="figure" id="figure" viewBox="0 0 1000 420"
                role="img" data-i18n-attr="aria-label:a11yFigure" aria-label="The shapes on the board">
             <defs>
-              <!-- The bloom under a mark while it is named: a blurred copy of
-                   the mark itself, so the glow is in the mark's OWN ink. -->
-              <filter id="partGlow" filterUnits="userSpaceOnUse" x="-200" y="-200" width="1400" height="820">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="bloom" />
-                <feMerge>
-                  <feMergeNode in="bloom" />
-                  <feMergeNode in="bloom" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-              <filter id="softBlur" filterUnits="userSpaceOnUse" x="-200" y="-200" width="1400" height="820">
-                <feGaussianBlur stdDeviation="5" />
-              </filter>
             </defs>
             <!-- Each section's own group, in playing order. -->
             <g id="figWarm" hidden></g>

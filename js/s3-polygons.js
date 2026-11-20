@@ -38,9 +38,12 @@
     { pts: at(SC.x, SC.y, IRR_PENT),     answer: 'zoneIrregular', wrong: 'o3Wrong5', right: 'o3Right5' },
     { pts: S.regular(7, SC.x, SC.y, 86), answer: 'zoneRegular',   wrong: 'o3Wrong6', right: 'o3Right6' }
   ];
-  /* the two sides, and how many cards each will end up holding */
+  /* the two sides, and how many cards each will end up holding: the same
+     big, flat panels as the warm-up's (no slab under them), close to the
+     figure's edges -- see s1-warmup.js */
   var ZONES = [{ name: 'zoneRegular', side: 'left' }, { name: 'zoneIrregular', side: 'right' }].map(function (z) {
     z.cap = ITEMS.filter(function (it) { return it.answer === z.name; }).length;
+    z.w = 290; z.h = 356; z.y = 32; z.m = 12; z.depth = false;
     return z;
   });
 
@@ -65,10 +68,7 @@
   /* ---- Scene 1: name the polygons ---------------------------------------- */
   function sceneNames() {
     var shapes = [], boxes = [];
-    return K.wipeBoard()
-      .then(function () { return K.say('o0Intro'); })
-      .then(function () { return Flow.wait(BEAT); })
-      .then(function () { return K.handOver(); })
+    return K.interlude(['o0Intro'])
       /* the four figures, drawn one after another */
       .then(function () {
         gNames.removeAttribute('hidden');
@@ -169,7 +169,7 @@
     return svg;
   }
   function summary() {
-    var grid = h('div', 'grid grid--2', dom.layer);
+    var grid = h('div', 'grid grid--2 grid--kinds', dom.layer);
     layerNodes.push(grid);
     var cards = [
       { svg: miniShape(S.regular(6, 125, 85, 70), 250, 170), title: 'o4RegTitle', lines: ['o4RegA', 'o4RegB'] },
@@ -177,8 +177,9 @@
     ].map(function (c) {
       var card = h('div', 'card', grid);
       card.appendChild(c.svg);
-      var t = h('p', 'card__title', card); t.textContent = T(c.title);
-      c.lines.forEach(function (k) { var r = h('div', 'card__row is-note', card); r.textContent = T(k); });
+      var text = h('div', 'card__text', card);
+      var t = h('p', 'card__title', text); t.textContent = T(c.title);
+      c.lines.forEach(function (k) { var r = h('div', 'card__row is-note', text); r.textContent = T(k); });
       return card;
     });
     return K.birdAway()

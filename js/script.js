@@ -34,7 +34,7 @@
 
     var tasks = [];
     function add(name, weight, run, queued) { tasks.push({ name: name, weight: weight, run: run, queued: !!queued }); }
-    ['assets/images/welcome-bg.jpg', 'assets/images/bg.jpg'].forEach(function (src) {
+    ['assets/images/welcome-bg.jpg', 'assets/images/bg.png'].forEach(function (src) {
       add(src, 3, function () { return imageReady(src); });
     });
     Object.keys(global.Mascot.SHEETS).forEach(function (clip) {

@@ -39,7 +39,6 @@
    written by Beats.pulseHold / partPulse. */
 .shape__side.is-pulsing {
   animation: side-breathe 1.05s ease-in-out var(--pulse-times, 3);
-  filter: url(#partGlow);
 }
 @keyframes side-breathe {
   0%, 100% { stroke-width: 5; }

@@ -4,6 +4,10 @@
  * The equilateral triangle, tapped side by side into a + a + a = 3a; the
  * square and the pentagon walked the same way; the pattern in a table; and
  * 6a, 7a, 8a dragged onto a hexagon, a heptagon and an octagon.
+ *   Pages 1-3 are laid out as the circle game's formula pane (pages.js: the
+ * perch): the board split 50 / 50, the shape drawn in the middle and carried
+ * to the centre of the left half, the bird up on the right saying every
+ * line from its bubble, and the working building under its feet.
  * ========================================================================== */
 (function (global) {
   'use strict';
@@ -15,10 +19,9 @@
   var BEAT = K.BEAT, SHORT = K.SHORT, LOOK = K.LOOK;
   var NUDGE_AFTER = 2400;
   /* Pages 1-3: each shape is drawn big in the middle of the board, then glides
-     left to ASIDE_X, and the working is set plain on the ice to its right
-     (no card, no heading -- the bird has already said them). */
-  var MID_X = 500, ASIDE_X = 280;
-  var CARD_AT = { left: '52%', top: '36%' };
+     left to ASIDE_X -- the middle of the board's left half; the right half
+     is the bird's, and the working is set under it. */
+  var MID_X = 500, ASIDE_X = 250;
 
   var dom = null, group = null, layerNodes = [];
   function build(kit) { dom = kit.dom(); group = document.getElementById('figRegular'); }
@@ -33,14 +36,18 @@
   function aside(g) {
     return Flow.anim(Beats.moveGroup(g, { x: ASIDE_X - MID_X }, 0.9, 'power3.inOut'));
   }
-  function sumCard() {
-    var card = W.sumCard(dom.layer, { cls: 'card--plain', style: CARD_AT });
-    layerNodes.push(card.el);
-    return card;
+  /* The working under the bird: the sum ("a + a + a", landing a term at a
+     time), then "= 3a" and "= 3 × side". Every row is laid out up front,
+     unseen, so the card is its final size from the start and nothing in it
+     moves as the rows come in. */
+  function workCard(n, eq, rule) {
+    var card = K.perchSum(null, { terms: aLabels(n) }, 'card--steps');
+    return { card: card, eq: card.row(T(eq), 'is-result'), rule: card.row(T(rule), 'is-soft') };
   }
-  function clearPage(g, cardEls) {
-    return Promise.all([Flow.anim(Beats.cardOut(cardEls)), Flow.anim(Beats.clearFigure([g]))]).then(function () {
-      cardEls.forEach(function (c) { if (c.parentNode) c.parentNode.removeChild(c); layerNodes = layerNodes.filter(function (n) { return n !== c; }); });
+  /* Next pressed: the bird drops away with its bubble and the working, and
+     the shape goes, all at once. */
+  function clearPage(g) {
+    return Promise.all([K.perchDown(), Flow.anim(Beats.clearFigure([g]))]).then(function () {
       if (g.parentNode) g.parentNode.removeChild(g);
     });
   }
@@ -48,19 +55,24 @@
   /* ---- page 1: the triangle, tapped --------------------------------------- */
   function pageTriangle() {
     var g = S.el('g'); group.appendChild(g);
-    var shape = S.build(g, S.regular(3, MID_X, 236, 162), { inks: true, labels: aLabels(3), offset: 34, hits: true, cls: 'shape--big' });
-    var card = sumCard();
+    var shape = S.build(g, S.regular(3, MID_X, 236, 162), { inks: true, labels: aLabels(3), hits: true, cls: 'shape--big' });
+    var w = null;
     var stopHand = null, touched = false;
-    return Flow.anim(Beats.drawShape(shape, { time: 1.4 }))
-      .then(function () { return Flow.wait(SHORT); })
-      .then(function () {
-        K.onPhrase('r1Start', 'Let each side', function () { return Flow.anim(Beats.labelsIn(shape.labels)); });
-        return K.speakBySentence('r1Start');
-      })
+    /* the header stays shut: the bird speaks from beside the shape */
+    return Flow.anim(K.collapseHeader(true))
+      .then(function () { return Flow.anim(Beats.drawShape(shape, { time: 1.4 })); })
       .then(function () { return Flow.wait(SHORT); })
       .then(function () { return aside(g); })
-      .then(function () { return Flow.anim(Beats.cardIn(card.el)); })
-      .then(function () { return K.speakBySentence('r1Walk'); })
+      .then(function () {
+        K.onPhrase('r1Start', 'Let each side', function () { return Flow.anim(Beats.labelsIn(shape.labels)); });
+        return K.perchSay('r1Start');
+      })
+      .then(function () { return Flow.wait(SHORT); })
+      .then(function () {
+        w = workCard(3, 'lblEq3a', 'lblEq3side');
+        return Flow.anim(Beats.cardIn(w.card.el));
+      })
+      .then(function () { return K.perchSay('r1Walk'); })
       .then(function () {
         K.quiet(Flow.wait(NUDGE_AFTER).then(function () { if (!touched) stopHand = W.handNudge(shape.hits[0], { x: 0.5, y: 0.5 }); }));
         return K.armTapSides(shape, {
@@ -68,41 +80,47 @@
             touched = true;
             if (stopHand) { stopHand(); stopHand = null; }
             Beats.lightSide(shape, i, { label: true });
-            card.term('a', shape.ink(i));
+            w.card.term('a', shape.ink(i));
           }
         });
       })
       .then(function () { if (stopHand) stopHand(); return Flow.wait(SHORT); })
-      .then(function () { return card.result(T('lblEq3a')); })
-      .then(function () { return card.row(T('lblEq3side'), 'is-soft').show(); })
+      .then(function () { return w.eq.show(); })
+      .then(function () { return w.rule.show(); })
       .then(function () {
         var c = shape.centre(); K.burstAt(c.x + ASIDE_X - MID_X, c.y);
-        return K.speakBySentence('r1Done', 'happy');
+        return K.perchSay('r1Done', 'happy');
       })
       .then(function () { return K.handOver(); })
-      .then(function () { return clearPage(g, [card.el]); });
+      .then(function () { return clearPage(g); });
   }
 
   /* ---- pages 2 and 3: the square and the pentagon, walked ------------------ */
   function pageWalked(o) {
     var g = S.el('g'); group.appendChild(g);
-    var shape = S.build(g, o.pts, { inks: true, labels: aLabels(o.pts.length), offset: 34, cls: 'shape--big' });
-    var card = sumCard();
-    return Flow.anim(Beats.drawShape(shape, { time: 1.2 }))
+    var shape = S.build(g, o.pts, { inks: true, labels: aLabels(o.pts.length), cls: 'shape--big' });
+    var w = null;
+    return Flow.anim(K.collapseHeader(true))
+      .then(function () { return Flow.anim(Beats.drawShape(shape, { time: 1.2 })); })
       .then(function () { return Flow.anim(Beats.labelsIn(shape.labels)); })
       .then(function () { return Flow.wait(SHORT); })
       .then(function () { return aside(g); })
-      .then(function () { return Flow.anim(Beats.cardIn(card.el)); })
+      /* the bird up on the right, the working under it */
+      .then(function () { return K.perchUp(); })
+      .then(function () {
+        w = workCard(o.pts.length, o.eq, o.rule);
+        return Flow.anim(Beats.cardIn(w.card.el));
+      })
       .then(function () {
         return Flow.anim(Beats.walk(shape, 2.2, {
-          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); card.term('a', shape.ink(k)); }
+          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); w.card.term('a', shape.ink(k)); }
         }));
       })
-      .then(function () { return card.result(T(o.eq)); })
-      .then(function () { return card.row(T(o.rule), 'is-soft').show(); })
-      .then(function () { return K.speakBySentence(o.say); })
+      .then(function () { return w.eq.show(); })
+      .then(function () { return w.rule.show(); })
+      .then(function () { return K.perchSay(o.say); })
       .then(function () { return K.handOver(); })
-      .then(function () { return clearPage(g, [card.el]); });
+      .then(function () { return clearPage(g); });
   }
 
   /* ---- page 4: the pattern ------------------------------------------------- */
@@ -149,7 +167,7 @@
         group.removeAttribute('hidden');
         return DRAG.reduce(function (chain, f) {
           return chain.then(function () {
-            var s = S.build(group, S.regular(f.n, f.cx, 138, 70), { inks: true, inkFrom: shapes.length, labels: aLabels(f.n), offset: 20, name: f.name, nameGap: 58 });
+            var s = S.build(group, S.regular(f.n, f.cx, 138, 70), { inks: true, inkFrom: shapes.length, labels: aLabels(f.n), name: f.name, nameGap: 58 });
             s.labels.forEach(function (l) { l.setAttribute('font-size', '20'); });
             shapes.push(s);
             return Flow.anim(Beats.drawShape(s, { time: 0.7 })).then(function () {

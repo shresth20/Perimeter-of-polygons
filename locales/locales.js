@@ -45,6 +45,7 @@ window.GAME_LOCALES={
     "lblSides": "{n} sides",
     "fbCorrect": "Correct!",
     "fbNotQuite": "Not quite!",
+    "fbAutoRight": "This is the correct answer.",
     "praiseWellDone": "Well done!",
     "praiseExcellent": "Excellent!",
     "praiseAwesome": "Awesome!",
@@ -180,7 +181,8 @@ window.GAME_LOCALES={
     "lblHouse": "House shape",
     "lblSquareTri": "A square and a triangle",
     "lblTShape": "T-shape",
-    "endDone": "Great job! You can now find the perimeter of any polygon!",
+    "endGood": "Good job!",
+    "endDone": "You can now find the perimeter of any polygon!",
     "uiTitleTop": "Perimeter of",
     "uiTitleBottom": "Polygons"
   }

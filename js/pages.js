@@ -604,6 +604,14 @@
    * is up, the question and every verdict on it are said in that bubble and
    * the header stays shut. The bird jumps onto it the way it jumps onto the
    * header: up from behind the board and down onto its spot.
+   *   Laid out and behaving as the circle game's formula pane (circle-skill-2,
+   * #cfPane: circum.js / circum.css): the board split 50 / 50, the bird at
+   * the one size it is beside a figure, the bubble growing out of its head
+   * across the half, the answers arriving one by one under its feet, a wrong
+   * one spent and answered before any is live again, the answer lit for the
+   * learner once it is the only one left, and the rest stepping back from
+   * the right one. Only the mechanics are the circle's; the colours are the
+   * ice theme's (style.css).
    * ====================================================================== */
   var perch = null;
   var SENTENCE_HOLD = 560;   /* ms a sentence is held before the next replaces it */
@@ -660,7 +668,9 @@
     var parts = sentencesOf(line.text);
     parts = parts ? parts.map(function (s) { return s.trim(); }) : [line.text];
     var fast = Flow.isFast();
-    if (fast) parts = parts.slice(-1);
+    /* Skipped over: only its last sentence is shown, but every beat armed on
+       its words (onPhrase) is let go all the same, as say() does. */
+    if (fast) { began(line.text); parts.forEach(function (s) { began(s); }); parts = parts.slice(-1); }
     var cues = fast ? null : cuesFor(line.text, line.vo);
     var up = P.open ? Promise.resolve() : perchOpen(P);
     return up.then(function () {
@@ -700,25 +710,153 @@
     mascot.state('talking');
     return quiet(voiceOver(key).then(function () { if (mine === speaking) mascot.settle(); }));
   }
-  /* The answers, in a row under the bird. */
+  /* The bird brought up onto its spot with nothing said yet -- for a page
+     that puts its working under the bird before the bird has a line. */
+  function perchUp() {
+    var P = perch || (perch = perchBuild());
+    return P.open ? Promise.resolve() : perchOpen(P);
+  }
+  /* The answers, in a row under the bird, one by one. One size for the row,
+     as the circle's formulas are: every pill as tall as the tallest and --
+     while three that wide still stand in one row -- as wide as the widest,
+     so no answer is the odd one out. */
   function perchChoices(labels) {
     var P = perch || (perch = perchBuild());
+    P.answers.classList.remove('is-working', 'is-hearing');
     var btns = buildChoices(P.answers, labels);
-    return Flow.anim(Beats.trayIn(P.answers, btns)).then(function () { return btns; });
+    var w = 0, hh = 0;
+    btns.forEach(function (b) {
+      var r = b.getBoundingClientRect();
+      w = Math.max(w, r.width); hh = Math.max(hh, r.height);
+    });
+    var row = P.answers.getBoundingClientRect();
+    var cs = getComputedStyle(P.answers);
+    var room = row.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+             - (parseFloat(cs.columnGap || cs.gap) || 0) * (btns.length - 1);
+    var same = w * btns.length <= room;
+    btns.forEach(function (b) {
+      if (same) b.style.minWidth = Math.ceil(w) + 'px';
+      b.style.minHeight = Math.ceil(hh) + 'px';
+    });
+    return Flow.anim(Beats.optsIn(btns)).then(function () { return btns; });
   }
-  /* Whatever is under the bird -- the answers -- taken away. */
+  /* Whatever is under the bird -- the answers, or a card -- taken away. */
   function perchClear() {
     var P = perch;
     if (!P) return Promise.resolve();
     var kids = Array.prototype.slice.call(P.answers.children);
-    return Flow.anim(Beats.cardOut(kids)).then(function () { P.answers.textContent = ''; });
+    var pills = kids.filter(function (k) { return k.classList.contains('choice'); });
+    var rest = kids.filter(function (k) { return pills.indexOf(k) < 0; });
+    return Promise.all([Flow.anim(Beats.optsOut(pills)), Flow.anim(Beats.cardOut(rest))]).then(function () {
+      if (perch !== P) return;
+      P.answers.textContent = '';
+      P.answers.classList.remove('is-hearing');
+    });
+  }
+  /* The row under the bird, handed to a section for a card of its own (the
+     heptagon's facts, s5): laid out as the working is, from under the
+     bird's feet down. */
+  function perchRow() {
+    var P = perch || (perch = perchBuild());
+    P.answers.classList.add('is-working');
+    return P.answers;
   }
   /* A sum card under the bird, where the answers stood (W.sumCard);
-     `reserve` ({ terms, total }) sizes it for the finished sum up front. */
-  function perchSum(title, reserve) {
-    var P = perch || (perch = perchBuild());
+     `reserve` ({ terms, total }) sizes it for the finished sum up front;
+     `cls` adds a look of the section's own. */
+  function perchSum(title, reserve, cls) {
     var long = reserve && reserve.terms && reserve.terms.length > 5;
-    return W.sumCard(P.answers, { title: title, cls: 'card--perch' + (long ? ' card--long' : ''), reserve: reserve });
+    return W.sumCard(perchRow(), { title: title, reserve: reserve,
+      cls: 'card--perch' + (long ? ' card--long' : '') + (cls ? ' ' + cls : '') });
+  }
+
+  /* ---- the question under the bird ---------------------------------------
+     The circle game's press (circum.js armChoices), on the perch's pills:
+       a wrong pill is spent -- it shakes, goes red and stays so -- and no
+       pill is live until `o.onWrong(i)`, the saying of why (a promise), is
+       over; then it steps back and the learner tries again among the rest.
+       Once only the answer is left, the wait ends and the answer is lit for
+       the learner, without the chime. The right one goes green; either way
+       the others step back from it, so the green one is what the eye is
+       left on. Resolves { tries, auto } -- `auto` when it was put in. */
+  var AUTO_AFTER = 500;   /* ms: the last wrong pill stepped back first */
+  function perchAsk(btns, right, o) {
+    o = o || {};
+    var P = perch;
+    var answer = btns[right];
+    var live = true, busy = false, tries = 0, auto = false;
+    function hearing(on) { if (P) P.answers.classList.toggle('is-hearing', on); }
+    function onPick(ev) {
+      if (!live || busy) return;
+      var btn = ev.currentTarget;
+      if (btn.classList.contains('is-done')) return;
+      ripple(ev, btn);
+      tries++;
+      if (btn === answer) {
+        live = false;
+        Beats.choiceRight(btn);
+        dom.gate.dispatchEvent(new MouseEvent('click'));
+        return;
+      }
+      btn.classList.add('is-done');
+      busy = true;
+      hearing(true);
+      var left = btns.filter(function (b) { return !b.classList.contains('is-done'); });
+      var last = left.length === 1 && left[0] === answer;
+      quiet(Promise.all([
+        Flow.anim(Beats.choiceWrong(btn)),
+        o.onWrong ? o.onWrong(btns.indexOf(btn)) : null
+      ]).then(function () {
+        btn.classList.remove('is-wrong');
+        if (!live) return;          /* answered already: a skip, or the scene gone */
+        return Flow.anim(M.to(btn, { opacity: 0.55, duration: M.dur(0.3), ease: 'power2.inOut' }));
+      }).then(function () {
+        busy = false;
+        hearing(false);
+        if (!live || !last) return;
+        live = false;
+        auto = true;
+        dom.gate.dispatchEvent(new MouseEvent('click'));
+      }));
+    }
+    function off() {
+      live = false;
+      hearing(false);
+      btns.forEach(function (b) {
+        b.removeEventListener('click', onPick);
+        b.classList.add('is-done');
+      });
+    }
+    btns.forEach(function (b) { b.addEventListener('click', onPick); });
+    return Flow.once(dom.gate, { auto: true }).then(
+      function () {
+        off();
+        return (auto ? Flow.wait(AUTO_AFTER) : Promise.resolve()).then(function () {
+          /* lit for the learner (put in, or answered by a skip) */
+          if (!answer.classList.contains('is-right')) {
+            answer.classList.add('is-right');
+            if (auto) quiet(Flow.anim(M.correct(answer)));
+          }
+          quiet(Flow.anim(M.focus(answer, btns, { opacity: 0.4 })));
+          return { tries: tries, auto: auto };
+        });
+      },
+      function (err) { off(); throw err; });
+  }
+  /* The right answer's line, in the bubble, green. An answer put in for the
+     learner is named first ("This is the correct answer.") and the line's
+     own "Correct!" is left off -- the learner did not find it. */
+  function perchRight(key, res) {
+    if (!res || !res.auto) return perchLine(key, 'happy', 'yes');
+    var text = keyed(key).text, praise = T('fbCorrect');
+    if (text.indexOf(praise) === 0) text = text.slice(praise.length).trim();
+    return perchLine('fbAutoRight', 'happy', 'yes').then(function () {
+      if (!text) return null;
+      var mine = speaking;
+      return Flow.wait(SENTENCE_HOLD).then(function () {
+        if (mine === speaking) return perchLine({ text: text, vo: null }, 'happy', 'yes');
+      });
+    });
   }
   /* The perch taken down: the bubble shuts, the bird jumps away behind the
      board, the row under it goes. */
@@ -748,9 +886,11 @@
   /* ---- praise ------------------------------------------------------------- */
   var PRAISE = ['praiseWellDone', 'praiseExcellent', 'praiseAwesome', 'praiseFantastic', 'praisePerfect'];
   var praised = 0;
-  function celebrate() {
+  /* Confetti over the board, or over `host` (the frame, when the board is
+     closed -- as at the end). */
+  function celebrate(host) {
     Beats.sfx('cheer');
-    quiet(Flow.anim(Beats.confettiRain(dom.board)));
+    quiet(Flow.anim(Beats.confettiRain(host || dom.board)));
   }
   function praise(key) {
     celebrate();
@@ -1287,11 +1427,20 @@
     slot.style.left = ((fw / 2 - mid + sw / 2) / fw * 100) + '%';
   }
 
-  /* An interlude between sections, as at the welcome: the board is cleared
-     and closed, the bird is left standing centre stage (it stands behind the
-     board, so the board's fade uncovers it), says its lines in the bubble,
-     hands over to Next, and the board opens again. */
+  /* An interlude between sections, as at the welcome: the bird says its
+     lines centre stage, hands over to Next, and the board opens again. */
   function interlude(keys) {
+    return centreStage(keys)
+      .then(function () { mascot.settle(); return Flow.wait(SHORT); })
+      .then(function () { return handOver(); })
+      .then(openBoard);
+  }
+
+  /* Centre stage, as at the welcome: the board is cleared and closed, the
+     bird is left standing centre stage (it stands behind the board, so the
+     board's fade uncovers it) and says its lines in the bubble -- the first
+     popping the bubble in, each next one morphing it. */
+  function centreStage(keys) {
     var e = mascot.el;
     var lines = keys.map(function (k) { return keyed(k); });
     return wipeBoard()
@@ -1319,10 +1468,7 @@
               return Promise.all([said, heard]);
             });
         }, Promise.resolve());
-      })
-      .then(function () { mascot.settle(); return Flow.wait(SHORT); })
-      .then(function () { return handOver(); })
-      .then(openBoard);
+      });
   }
 
   /* The board opened: the bird and its bubble leave centre stage first (so
@@ -1338,12 +1484,12 @@
       .then(function () { return Flow.wait(SHORT); });
   }
 
-  /* The end: the bird's last line, then Play again. */
+  /* The end, as at the welcome: the board closes, the bird says its last
+     lines centre stage in the bubble, confetti over the frame, then Play
+     again. */
   function sceneEnd() {
-    return wipeBoard()
-      .then(function () { return Flow.anim(openHeader()); })
-      .then(function () { return say('endDone', 'happy'); })
-      .then(function () { mascot.state('celebrating'); celebrate(); return Flow.wait(1600); })
+    return centreStage(['endGood', 'endDone'])
+      .then(function () { mascot.state('celebrating'); celebrate(dom.frame); return Flow.wait(1600); })
       .then(function () { mascot.settle(); return Flow.wait(SHORT); })
       .then(function () {
         M.button3d(dom.restartBtn, { edge: 4 });
@@ -1501,6 +1647,7 @@
     askChoice: askChoice, askUntilRight: askUntilRight,
     perchSay: perchLine, perchVoice: perchVoice, perchChoices: perchChoices,
     perchClear: perchClear, perchSum: perchSum, perchDown: perchDown,
+    perchUp: perchUp, perchRow: perchRow, perchAsk: perchAsk, perchRight: perchRight,
     armQuiz: armQuiz, armSwipe: armSwipe, armTapSides: armTapSides,
     dragGuide: function (to) { return W.dragGuide(dom.tray, to); },
     ripple: ripple, quiet: quiet, clearInline: clearInline

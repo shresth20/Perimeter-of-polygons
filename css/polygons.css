@@ -322,25 +322,14 @@
 .perch .card--perch.card--long .card__row {
   font-size: clamp(18px, calc(var(--board-w) * .028), 42px);
 }
-/* The working beside a regular polygon (s4-regular.js, pages 1-3): only the
-   equations, large, straight on the ice -- no card, no heading. The same
-   white halo as the perch working keeps the letters clear of the board. */
-.card--plain {
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-  text-shadow:
-    0 0 2px var(--snow),
-    0 0 4px var(--snow),
-    0 0 10px color-mix(in srgb, var(--snow) 80%, transparent);
+/* The working beside a regular polygon (s4-regular.js, pages 1-3): no
+   heading, the sum and the two lines under it -- "= 3a", "= 3 × side" --
+   a step smaller so all three stand under the bird. */
+.perch .card--perch.card--steps .card__row {
+  font-size: clamp(18px, calc(var(--board-w) * .032), 48px);
 }
-.card--plain .card__row {
-  margin: .2em 0;
-  font-size: clamp(24px, calc(var(--board-w) * .044), 64px);
-}
-.card--plain .card__row.is-soft {
-  font-size: clamp(20px, calc(var(--board-w) * .034), 50px);
+.perch .card--perch.card--steps .card__row.is-soft {
+  font-size: clamp(15px, calc(var(--board-w) * .025), 38px);
 }
 /* the finished sum, laid out unseen: it gives the card its width only */
 .card__ghost {

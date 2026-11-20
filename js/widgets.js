@@ -26,12 +26,15 @@
   /* ---- the hand -----------------------------------------------------------
      A flat pointing hand, drawn once per use into a fixed layer over the
      page, placed in client pixels. */
+  /* One closed outline (so the palm fills solid, with no gap between the
+     knuckles), then the three finger lines as open strokes on top. */
   var HAND_D =
     'M-3.5 26 C-5 24 -7 23 -9.5 23.5 C-13 24.5 -14 28 -12 31 L-6 39 C-3 44 3 47 9 47 ' +
-    'C18 47 24.5 41 24.5 31 L24.5 18.5 A3.5 3.5 0 0 0 17.5 18.5 L17.5 22 ' +
-    'M17.5 22 L17.5 16 A3.5 3.5 0 0 0 10.5 16 L10.5 22 ' +
-    'M10.5 22 L10.5 13.5 A3.5 3.5 0 0 0 3.5 13.5 L3.5 22 ' +
-    'M3.5 22 L3.5 3.5 A3.5 3.5 0 0 0 -3.5 3.5 L-3.5 26';
+    'C18 47 24.5 41 24.5 31 L24.5 18.5 A3.5 3.5 0 0 0 17.5 18.5 ' +
+    'L17.5 16 A3.5 3.5 0 0 0 10.5 16 ' +
+    'L10.5 13.5 A3.5 3.5 0 0 0 3.5 13.5 ' +
+    'L3.5 3.5 A3.5 3.5 0 0 0 -3.5 3.5 Z ' +
+    'M17.5 18.5 L17.5 22 M10.5 16 L10.5 22 M3.5 13.5 L3.5 22';
   var HAND_H = 50;
 
   function handLayer() {

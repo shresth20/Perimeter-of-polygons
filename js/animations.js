@@ -620,6 +620,22 @@
     var tl = M.incorrect(btn);
     return tl;
   }
+  /* The answers under the bird beside the shape, as the circle game brings
+     its formulas in (circum.js optsIn / optsOut): one by one, each pill its
+     own arrival, and away again a beat apart. Hidden first, or the row
+     flashes complete for the frame before the tween's first. */
+  function optsIn(list) {
+    M.set(list, { opacity: 0 });
+    var tl = M.timeline({ willChange: list, willChangeValue: 'transform, opacity' });
+    tl.fromTo(list, { opacity: 0, y: 14, scale: 0.9 },
+      { opacity: 1, y: 0, scale: 1, duration: M.dur(0.4), ease: M.POP, stagger: M.gap(0.3) });
+    return tl;
+  }
+  function optsOut(list) {
+    var tl = M.timeline({ willChange: list, willChangeValue: 'transform, opacity' });
+    if (list.length) tl.to(list, { opacity: 0, y: 10, scale: 0.94, duration: M.dur(0.3), ease: 'power2.in', stagger: M.gap(0.08) });
+    return tl;
+  }
   function chipHome(chip) {
     return M.to(chip, { x: 0, y: 0, scale: 1, duration: M.dur(0.36), ease: 'power3.out', overwrite: 'auto' });
   }
@@ -703,6 +719,18 @@
   var TAIL_BORDER = 4;
   function tailOrigin(bubble) {
     var style = getComputedStyle(bubble);
+    /* The bubble beside the shape (.bubble--perch, style.css) wears the
+       circle game's side-pane tail, placed off its own em and the pane's
+       container units, so its middle is read off the drawn tail rather than
+       summed here. Resolved pixels: GSAP splits transform-origin on spaces,
+       so a raw calc() could not be passed through. */
+    if (bubble.classList.contains('bubble--perch')) {
+      var tail = bubble.querySelector('.bubble-tail');
+      if (tail) {
+        var ts = getComputedStyle(tail);
+        return (parseFloat(style.borderLeftWidth) + parseFloat(ts.left) + parseFloat(ts.width) / 2) + 'px 100%';
+      }
+    }
     var em = parseFloat(style.fontSize) || 16;
     return (TAIL_BORDER + em * TAIL_X) + 'px 100%';
   }
@@ -874,6 +902,7 @@
     swipeIn: swipeIn, swipeHome: swipeHome, swipeInto: swipeInto, swipeWrong: swipeWrong, swipeNudge: swipeNudge,
     boxIn: boxIn, boxRight: boxRight, boxWrong: boxWrong,
     trayIn: trayIn, trayOut: trayOut, choiceRight: choiceRight, choiceWrong: choiceWrong,
+    optsIn: optsIn, optsOut: optsOut,
     chipHome: chipHome, chipDock: chipDock,
     cardIn: cardIn, cardsIn: cardsIn, cardOut: cardOut, rowIn: rowIn, termIn: termIn, ruleIn: ruleIn, emphasise: emphasise,
     lightsOn: lightsOn,

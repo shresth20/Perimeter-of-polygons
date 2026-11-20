@@ -4,8 +4,9 @@
  * Three questions. Each shape is drawn large by the pen in the middle of
  * the board, its lengths written on, then carried to the left; the bird
  * jumps up on the right and asks in its bubble, three answers under it
- * ("Tap the correct answer." is heard only). Every verdict is said in the
- * same bubble. A right answer: the answers make way for the working --
+ * ("Tap the correct answer." is heard only) -- the circle game's formula
+ * pane, in ice (pages.js: the perch). Every verdict is said in the same
+ * bubble. A right answer: the answers make way for the working --
  * "Perimeter:" over the sum -- while a light runs round the boundary and
  * each side's length lands in the sum as it is passed. Then the three
  * formulas, side by side.
@@ -54,7 +55,7 @@
   function question(q, i) {
     var g = S.el('g');
     group.appendChild(g);
-    var shape = S.build(g, q.pts, { inks: true, labels: q.sum.map(cm), offset: 34, cls: 'shape--big' });
+    var shape = S.build(g, q.pts, { inks: true, labels: q.sum.map(cm), cls: 'shape--big' });
     var dx = ASIDE_X - MID_X;
     var c = shape.centre();
 
@@ -72,14 +73,14 @@
       .then(function () { return K.perchChoices(q.opts.map(cm)); })
       .then(function (btns) {
         K.perchVoice('bTap');
-        return K.askUntilRight(btns, q.right, {
+        return K.perchAsk(btns, q.right, {
           onWrong: function (k) { return K.perchSay(q.wrong[k] || 'bWrongGeneric', 'confused', 'no'); }
         });
       })
       /* right: said in the bubble, while the answers make way for the
          working and the light walks the boundary into the sum */
-      .then(function () {
-        var told = K.perchSay(q.told, 'happy', 'yes');
+      .then(function (res) {
+        var told = K.perchRight(q.told, res);
         var card = null;
         var work = Flow.wait(BEAT)
           .then(function () { return K.perchClear(); })
@@ -108,7 +109,7 @@
   /* A small shape for a summary card, in its own little picture. */
   function miniShape(pts, labels, w, hh) {
     var svg = S.el('svg', { viewBox: '0 0 ' + w + ' ' + hh });
-    var s = S.build(svg, pts, { inks: true, labels: labels, offset: 22 });
+    var s = S.build(svg, pts, { inks: true, labels: labels });
     s.labels.forEach(function (l) { l.setAttribute('font-size', '26'); });
     return svg;
   }

@@ -79,9 +79,15 @@
   --board-rim:  var(--snow);
   --frost-line: color-mix(in srgb, var(--ice-deep) 22%, transparent);
 
-  --bubble-bg:  var(--snow);
-  --bubble-rim: var(--ice-3);
-  --bubble-ink: var(--ink);
+  /* The centre-stage bubble (welcome, interludes, the end): warm yellow on
+     the icy lake, in the gold of Start and the cabin's light. The perch's
+     bubble keeps its own ice colours (.bubble--perch). */
+  --bubble-bg:       #FFF2A8;
+  --bubble-rim:      var(--gold);
+  --bubble-ink:      var(--ink);
+  --bubble-shine:    var(--snow);
+  --bubble-glow:     color-mix(in srgb, var(--gold) 50%, transparent);
+  --bubble-glow-dim: color-mix(in srgb, var(--gold) 22%, transparent);
 
   --page-bg:      var(--ice-3);
   --page-bg-deep: var(--ice-deep);
@@ -142,6 +148,12 @@
   --board-pad-x: clamp(18px, calc(var(--board-w) * .032), 44px);
   --stage-full-h: calc(var(--board-w) * 9 / 16 - 2 * var(--board-pad-y) - 6px);
   --stage-full-w: calc(var(--board-w) - 2 * var(--board-pad-x) - 6px);
+
+  /* The bird beside a shape, and the type of the bubble it speaks from, at
+     the circle game's sizes (its --bird-beside / --bubble-beside-fs): the
+     bird 36% of the stage's full height, the type 5.3% of half its width. */
+  --bird-beside: calc(var(--stage-full-h) * .36);
+  --bubble-beside-fs: calc(var(--stage-full-w) * .5 * .053);
 }
 
 /* ---- Reset ------------------------------------------------------------- */
@@ -535,18 +547,21 @@ body {
   left: calc(var(--bub-tip-x) - 4px - .815em);
   bottom: calc(var(--bub-tip-y) + .725em - 8px);
   width: max-content;
-  max-width: min(1000px, calc(100vw - 24px));
+  max-width: min(1200px, calc(100vw - 24px));
   padding: .5em .85em;
   border: 4px solid var(--note-edge);
   border-radius: var(--bub-corner);
   background: var(--bubble-bg);
   box-shadow:
-    0 0 14px 2px var(--glow-board-soft),
-    0 0 34px 10px var(--glow-board-dim),
+    0 0 14px 2px var(--bubble-glow),
+    0 0 34px 10px var(--bubble-glow-dim),
     0 10px 26px var(--shadow-soft);
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: clamp(14px, calc(var(--board-w) * .0236), 44px);
+  /* The centre-stage bubble (welcome, interludes, the end). Everything in it
+     -- padding, corner, tail -- is in em, so this one size scales it all.
+     The perch's bubble sets its own size (.bubble--perch). */
+  font-size: clamp(14px, calc(var(--board-w) * .0272), 50px);
   line-height: 1.2;
   letter-spacing: .2px;
   text-align: left;
@@ -562,72 +577,206 @@ body {
   width: var(--bub-light-w);
   height: var(--bub-light-h);
   border-radius: 999px;
-  background: var(--ice-2);
+  background: var(--bubble-shine);
   transform: rotate(-22deg);
   opacity: .9;
 }
 .bubble .type-wrap { display: inline-block; vertical-align: top; }
 
 /* ---- The bird beside the shape (pages.js: the perch) ----------------------
-   The right half of the stage, over the figure: the bird's spot, the bubble
-   over its head (the centre-stage bubble, stamped again, so its tail lands
-   on the head exactly as it does there), and under its feet a row for the
-   answers -- and, once one is right, the working. Every height is a share
-   of the stage, and none of them depends on what is in the bubble or the
-   row, so nothing under the bird moves when a line or a verdict changes. */
+   The board split 50 / 50: the shape stands in the left half, and the right
+   half is this pane, laid out exactly as the circle game's formula pane
+   (circle-skill-2, .cf-pane in css/circum.css). Only the layout and the
+   behaviour are the circle's -- every colour here is the ice palette's.
+     A size container, so the bird, its bubble and the row under it are
+   measured against THIS half (cqw / cqh) and hold at every board size. The
+   bird stands at the pane's left, a little above the middle -- between the
+   bubble over its head and the row under its feet -- at the one size it is
+   beside a figure; the bubble grows out of its head across the half; the
+   answers stand in a row beneath, and once one is right the working takes
+   their place. None of it depends on what is in the bubble or the row, so
+   nothing moves when a line or a verdict changes. Glass throughout: only
+   the answers are ever live. */
 .layer > .perch {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   width: 50%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding-top: 7%;
+  container-type: size;
   pointer-events: none;
+
+  /* Where the bird stands and how big it is, and the right edge the bubble
+     may grow to -- named once, because the bubble's widest reach is worked
+     out from all three (see .bubble--perch). */
+  --perch-bird-left: -2cqw;
+  --perch-bird-size: var(--bird-beside);
+  --perch-reach: 97cqw;
 }
+/* The bird's spot. Square, as every slot is, so the bubble's tail anchoring
+   (percentages of the cell) reads straight off it. */
 .perch__stand {
-  position: relative;
-  flex: 0 0 auto;
-  align-self: flex-start;
-  margin-left: 12%;
-  height: 40%;
+  position: absolute;
+  left: var(--perch-bird-left);
+  bottom: 33cqh;
+  height: var(--perch-bird-size);
   aspect-ratio: 1;
 }
+
+/* ---- the row under the bird ------------------------------------------------
+   The answers: the game's own pills, in one row, sized against the pane --
+   as big as three can be and still stand in ONE row across the half. */
 .perch__answers {
-  flex: 0 0 auto;
-  width: 100%;
-  height: 20%;
-  margin-top: 1.5%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 15cqh;
   display: flex;
-  align-items: flex-start;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(12px, 5%, 40px);
+  align-items: center;
+  gap: clamp(6px, 1.6cqw, 14px);
+  padding: 0 1.5cqw;
+  pointer-events: none;
+}
+.perch__answers .choice {
   pointer-events: auto;
+  font-size: clamp(12px, 4cqw, 26px);
+  padding: .36em .95em .42em;
 }
-/* Beside the shape the bubble is a step smaller than centre stage, and it
-   wraps (rather than running off the board) at the width the panel leaves
-   it. A verdict tints it, rim, face and tail together: the tail reads the
-   same --note-edge and --bubble-bg. */
+/* A spent pill -- refused, or passed over once the answer is in -- is not a
+   control: restated here, because the rule above outranks .choice.is-done. */
+.perch__answers .choice.is-done { pointer-events: none; }
+/* ...and while a wrong one is being answered, none is (pages.js perchAsk). */
+.perch__answers.is-hearing .choice { pointer-events: none; }
+/* The working (or a card of facts), where the answers stood: hung from just
+   under the bird's feet and growing down, so a sum of several rows never
+   climbs into the bird. */
+.perch__answers.is-working {
+  top: 65cqh;
+  bottom: auto;
+  align-items: flex-start;
+  pointer-events: none;
+}
+.perch__answers > .card { position: relative; }
+
+/* ---- the bubble over the bird's head ---------------------------------------
+   The circle's side-pane bubble, drawn in ice: a rim deepening toward the
+   foot round a white face, a bevel and a gloss inside it, three soft shadows
+   lifting box and tail together. A verdict recolours the whole drawing --
+   rim, face, tail and words -- green for a right answer, red for a wrong
+   one. The hues are registered as colours, so the recolour is eased (a
+   gradient cannot be transitioned; the colours it is drawn from can). Where
+   @property is not understood the recolour is a cut, and nothing else
+   changes. Initial values: the ice palette's (--ice-3, --ice-deep, ...). */
+@property --perch-rim      { syntax: '<color>'; inherits: true; initial-value: #8FD4F7; }
+@property --perch-rim-low  { syntax: '<color>'; inherits: true; initial-value: #2A9BD8; }
+@property --perch-face     { syntax: '<color>'; inherits: true; initial-value: #E6F5FE; }
+@property --perch-face-mid { syntax: '<color>'; inherits: true; initial-value: #F5FBFF; }
+@property --perch-lip      { syntax: '<color>'; inherits: true; initial-value: #1474B8A6; }
+@property --perch-shade    { syntax: '<color>'; inherits: true; initial-value: #2A9BD840; }
+
+/* Placed by the tail's tip, as every bubble is: on the head's outline just
+   above its right eyebrow, 66% across the cell and 21% down it. The box is
+   set back from that point by where the tip falls inside it -- across, the
+   rim, the tail's offset and the 2/44 of its width the tip sits in from its
+   left edge; down, the tail's height (42/44 of its width) less the 8/44 it
+   is lifted into the rim. Wide before it is tall: a sentence runs out along
+   one row until the box reaches the pane's right edge, and only then wraps
+   and grows upward. */
 .bubble.bubble--perch {
-  font-size: clamp(14px, calc(var(--board-w) * .021), 34px);
-  max-width: calc(var(--board-w) * .34);
-  transition: background-color .25s ease, border-color .25s ease;
+  --perch-rim:      var(--ice-3);
+  --perch-rim-low:  var(--ice-deep);
+  --perch-face:     color-mix(in srgb, var(--ice-2) 45%, var(--snow));   /* the foot, and the tail's */
+  --perch-face-mid: color-mix(in srgb, var(--ice-2) 20%, var(--snow));
+  --perch-lip:      color-mix(in srgb, var(--ice-ink) 65%, transparent); /* the rounded underside */
+  --perch-shade:    color-mix(in srgb, var(--ice-deep) 25%, transparent);
+  --perch-border: .075em;
+  --perch-tail-left: 1.3em;
+  --perch-tail-w: 1.4em;
+  --bubble-bg: var(--perch-face);
+  --note-edge: var(--perch-rim-low);
+
+  --perch-tip-x: .66;
+  --perch-set-back: calc(var(--perch-border) + var(--perch-tail-left) + var(--perch-tail-w) * 2 / 44);
+  --bub-tip-x: calc(var(--perch-tip-x) * 100%);
+  --bub-tip-y: 79%;
+  left: calc(var(--bub-tip-x) - var(--perch-set-back));
+  bottom: calc(var(--bub-tip-y) + var(--perch-tail-w) * 34 / 44);
+  /* As wide as the pane allows: from the box's own left edge to
+     --perch-reach, in pane units, so it holds at every board size. */
+  max-width: calc(var(--perch-reach) - var(--perch-bird-left)
+                  - var(--perch-tip-x) * var(--perch-bird-size) + var(--perch-set-back));
+
+  padding: .5em .8em .58em;
+  border: var(--perch-border) solid transparent;
+  border-radius: 1.1em;
+  /* The fill is flat at the tail's colour for its last stretch, because the
+     tail's top reaches up into it and has to vanish there. */
+  background:
+    linear-gradient(180deg, var(--snow) 0%, var(--perch-face-mid) 40%, var(--perch-face) 84%) padding-box,
+    linear-gradient(180deg, var(--perch-rim) 0%, var(--perch-rim-low) 100%) border-box;
+  box-shadow: inset 0 0 0 .05em color-mix(in srgb, var(--snow) 90%, transparent),
+              inset 0 .22em .3em -.12em var(--snow),
+              inset .16em 0 .26em -.12em var(--perch-shade),
+              inset -.16em 0 .26em -.12em var(--perch-shade);
+  filter: drop-shadow(0 .1em .07em var(--perch-lip))
+          drop-shadow(0 .25em .22em color-mix(in srgb, var(--ink) 30%, transparent))
+          drop-shadow(0 .75em .9em color-mix(in srgb, var(--ink) 32%, transparent));
+  font-size: var(--bubble-beside-fs);
+  line-height: 1.38;
+  /* The verdict is a colour that comes and goes, not a shape: the box is
+     repainted in place, so nothing moves. The transform is GSAP's. */
+  transition: color .35s ease, --perch-rim .35s ease, --perch-rim-low .35s ease,
+              --perch-face .35s ease, --perch-face-mid .35s ease,
+              --perch-lip .35s ease, --perch-shade .35s ease;
 }
-.bubble--perch .type,
-.bubble--perch .type-ghost { white-space: pre-wrap; }
+/* No catch-light: the gloss inside the rim is its shine. */
+.bubble--perch::before { display: none; }
+/* The tail lifted until its stroke's start sits on the rim's outer edge, so
+   the fill closes the rim across the opening; its stroke as thick as the
+   rim, in the tail's own units. */
+.bubble--perch .bubble-tail {
+  left: var(--perch-tail-left);
+  top: calc(100% + var(--perch-border) - var(--perch-tail-w) * 8 / 44);
+  width: var(--perch-tail-w);
+}
+.bubble--perch .bubble-tail path:last-child {
+  stroke-width: 2.36;
+  vector-effect: none;
+}
+/* pre-wrap: each word carries its own trailing space (typer.js), and the
+   ghost underneath breaks at the same words. Never a last row of one stray
+   word: `pretty` takes a word down from the row above instead. */
+.bubble.bubble--perch .type,
+.bubble.bubble--perch .type-ghost {
+  white-space: pre-wrap;
+  text-align: left;
+}
+.bubble--perch .type-wrap,
+.bubble.bubble--perch .type { text-wrap: pretty; }
+/* The verdicts: the drawing in the verdict's hue, the words with it. */
 .bubble--perch.is-yes {
-  --note-edge: var(--right-border);
-  --bubble-bg: color-mix(in srgb, var(--right-fill) 24%, var(--snow));
+  --perch-rim:      color-mix(in srgb, var(--right-border) 50%, var(--snow));
+  --perch-rim-low:  var(--right-border);
+  --perch-face:     color-mix(in srgb, var(--right-fill) 22%, var(--snow));
+  --perch-face-mid: color-mix(in srgb, var(--right-fill) 8%, var(--snow));
+  --perch-lip:      color-mix(in srgb, var(--right-border) 60%, transparent);
+  --perch-shade:    color-mix(in srgb, var(--right-border) 18%, transparent);
+  color: color-mix(in srgb, var(--right-border) 78%, var(--ink));
 }
 .bubble--perch.is-no {
-  --note-edge: var(--wrong-border);
-  --bubble-bg: color-mix(in srgb, var(--wrong-fill) 22%, var(--snow));
+  --perch-rim:      color-mix(in srgb, var(--wrong-border) 50%, var(--snow));
+  --perch-rim-low:  var(--wrong-border);
+  --perch-face:     color-mix(in srgb, var(--wrong-fill) 22%, var(--snow));
+  --perch-face-mid: color-mix(in srgb, var(--wrong-fill) 8%, var(--snow));
+  --perch-lip:      color-mix(in srgb, var(--wrong-border) 60%, transparent);
+  --perch-shade:    color-mix(in srgb, var(--wrong-border) 18%, transparent);
+  color: var(--wrong-border);
 }
-.bubble--perch.is-yes::before { background: color-mix(in srgb, var(--right-fill) 45%, var(--snow)); }
-.bubble--perch.is-no::before { background: color-mix(in srgb, var(--wrong-fill) 40%, var(--snow)); }
+@media (prefers-reduced-motion: reduce) {
+  .bubble--perch { transition: none !important; }
+}
 .bubble-tail {
   position: absolute;
   left: var(--bub-tail-x);

@@ -770,18 +770,31 @@
     P.answers.classList.add('is-working');
     return P.answers;
   }
+  /* The working is set at one size in every section; a card laid out
+     wider than the bird's half (it is laid out at its finished width, so
+     this is known before anything is in it) has every row set smaller by
+     just as much as it needs (--fit, css/polygons.css). */
+  function fitPerch(card) {
+    var row = card.el.parentNode;
+    if (!row) return card;
+    card.el.style.removeProperty('--fit');
+    var cs = getComputedStyle(row);
+    var room = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var w = card.el.offsetWidth;
+    if (room > 0 && w > room) card.el.style.setProperty('--fit', (Math.floor(room / w * 1000) / 1000).toFixed(3));
+    return card;
+  }
   /* A sum card under the bird, where the answers stood (W.sumCard);
      `reserve` ({ terms, total }) sizes it for the finished sum up front;
      `cls` adds a look of the section's own. */
   function perchSum(title, reserve, cls) {
-    var long = reserve && reserve.terms && reserve.terms.length > 5;
-    return W.sumCard(perchRow(), { title: title, reserve: reserve,
-      cls: 'card--perch' + (long ? ' card--long' : '') + (cls ? ' ' + cls : '') });
+    return fitPerch(W.sumCard(perchRow(), { title: title, reserve: reserve,
+      cls: 'card--perch' + (cls ? ' ' + cls : '') }));
   }
   /* The steps card under the bird (W.stepsCard): "a + a + a = 3a" over
      "= 3 × side", the "=" signs one above the other. */
   function perchSteps(o) {
-    return W.stepsCard(perchRow(), { terms: o.terms, eq: o.eq, rule: o.rule, cls: 'card--perch' });
+    return fitPerch(W.stepsCard(perchRow(), { terms: o.terms, eq: o.eq, rule: o.rule, cls: 'card--perch' }));
   }
 
   /* ---- the question under the bird ---------------------------------------

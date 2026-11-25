@@ -22,6 +22,9 @@
      left to ASIDE_X -- the middle of the board's left half; the right half
      is the bird's, and the working is set under it. */
   var MID_X = 500, ASIDE_X = 250;
+  /* The three shapes drawn at section 3's size (s2-basics.js QS): each about
+     225 figure units tall, its box centred on y = 210, so a shape and its
+     working stand the same on every page of the two sections. */
 
   var dom = null, group = null, layerNodes = [];
   function build(kit) { dom = kit.dom(); group = document.getElementById('figRegular'); }
@@ -62,7 +65,7 @@
   /* ---- page 1: the triangle, tapped --------------------------------------- */
   function pageTriangle() {
     var g = S.el('g'); group.appendChild(g);
-    var shape = S.build(g, S.regular(3, MID_X, 236, 162), { inks: true, labels: aLabels(3), hits: true, cls: 'shape--big shape--letters' });
+    var shape = S.build(g, S.regular(3, MID_X, 248, 150), { inks: true, labels: aLabels(3), hits: true, cls: 'shape--big shape--letters' });
     var w = null;
     var stopHand = null, touched = false;
     /* the header stays shut: the bird speaks from beside the shape */
@@ -227,8 +230,8 @@
     return K.wipeBoard()
       .then(function () { group.removeAttribute('hidden'); })
       .then(pageTriangle)
-      .then(function () { return pageWalked({ pts: S.rect(MID_X - 115, 108, 230, 230), eq: 'r2Eq', rule: 'r2Rule', say: 'r2Say' }); })
-      .then(function () { return pageWalked({ pts: S.regular(5, MID_X, 226, 152), eq: 'r3Eq', rule: 'r3Rule', say: 'r3Say' }); })
+      .then(function () { return pageWalked({ pts: S.rect(MID_X - 114, 96, 228, 228), eq: 'r2Eq', rule: 'r2Rule', say: 'r2Say' }); })
+      .then(function () { return pageWalked({ pts: S.regular(5, MID_X, 222, 126), eq: 'r3Eq', rule: 'r3Rule', say: 'r3Say' }); })
       .then(pagePattern)
       .then(pageDrag);
   }

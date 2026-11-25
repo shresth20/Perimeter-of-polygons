@@ -163,6 +163,8 @@
     "lblEach4": "Each side = 4 cm",
     "lblIrrHept": "Irregular heptagon",
     "lblNotEqual": "The sides are not equal.",
+    "lblRegHeptFacts": "7 sides, each side = 4 cm",
+    "lblIrrHeptFacts": "7 sides, not all equal",
     "i1Look": "Look! The sides are not equal now. It is an irregular heptagon. To find its perimeter, add the lengths of all its sides.",
     "i2Ask": "What is the perimeter of this heptagon?",
     "i2Right": "Correct! Adding all side lengths gives the perimeter of the heptagon.",

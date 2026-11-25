@@ -313,6 +313,27 @@
     return tl;
   }
 
+  /* ---- the equal-side marks (Shapes.build ticks) ---------------------------
+     Popped onto their sides one after another, each with the landing pop;
+     a side with no mark (no equal) is passed over. Taken off together. */
+  function ticksIn(ticks, each) {
+    var list = [].concat(ticks).filter(function (t) { return t && t.getAttribute('d'); });
+    var tl = M.timeline({ willChange: list, willChangeValue: 'transform, opacity' });
+    list.forEach(function (t, i) {
+      var at = i * (each == null ? 0.06 : each);
+      M.set(t, { opacity: 0, scale: 0.3, transformOrigin: '50% 50%' });
+      tl.to(t, { opacity: 1, scale: 1, duration: M.dur(0.3), ease: 'back.out(2)' }, M.gap(at));
+      if (i % 2 === 0) tl.call(pop, null, M.gap(at));
+    });
+    return tl;
+  }
+  function ticksOut(ticks) {
+    var list = [].concat(ticks).filter(Boolean);
+    var tl = M.timeline({ willChange: list, willChangeValue: 'opacity' });
+    if (list.length) tl.to(list, { opacity: 0, duration: M.dur(0.22), ease: 'power2.in', overwrite: 'auto' });
+    return tl;
+  }
+
   /* ---- the warm-up's two highlights ---------------------------------------
      The boundary: a thick golden stroke run once round the shape (the dash
      trick), left breathing. The inside: a deep wash poured in from the
@@ -680,6 +701,159 @@
     tl.call(pop, null, 0);
     return tl;
   }
+
+  /* ---- a side's length carried into the sum --------------------------------
+     A copy of the number is picked up off the side's label on the shape (the
+     label stays where it is), carried across the board in a low arc and
+     dropped into its place in the working, where the term then stands.
+     `made` is the term and the "+" before it, both hidden until the drop;
+     `text` is the term ("8"), read off the front of the label ("8 cm").
+     The copy is a fixed-position twin of the term, so it wears the term's
+     own font and ink; only its transform and opacity move. Falls back to
+     the plain pop when there is no label to lift it from. */
+  var FLY_LIFT = 0.18, FLY_CARRY = 0.62, FLY_DROP = 0.22;
+  /* where the number sits on the label, on screen, and how big it is drawn */
+  function labelSpot(label, text) {
+    if (!label || !label.isConnected || !label.getScreenCTM) return null;
+    var m = label.getScreenCTM();
+    if (!m) return null;
+    var full = label.textContent || '';
+    var n = text && full.indexOf(text) === 0 ? text.length : full.length;
+    var box = null;
+    try {
+      for (var i = 0; i < n; i++) {
+        var r = label.getExtentOfChar(i);
+        [[r.x, r.y], [r.x + r.width, r.y + r.height]].forEach(function (p) {
+          var x = m.a * p[0] + m.c * p[1] + m.e, y = m.b * p[0] + m.d * p[1] + m.f;
+          if (!box) box = { x0: x, y0: y, x1: x, y1: y };
+          box.x0 = Math.min(box.x0, x); box.x1 = Math.max(box.x1, x);
+          box.y0 = Math.min(box.y0, y); box.y1 = Math.max(box.y1, y);
+        });
+      }
+    } catch (e) { box = null; }
+    if (!box) {
+      var b = label.getBoundingClientRect();
+      if (!b.width) return null;
+      box = { x0: b.left, y0: b.top, x1: b.right, y1: b.bottom };
+    }
+    var fs = parseFloat(global.getComputedStyle(label).fontSize) || 0;
+    return { x: (box.x0 + box.x1) / 2, y: (box.y0 + box.y1) / 2, fs: fs * Math.sqrt(m.a * m.a + m.b * m.b) };
+  }
+  function termFly(made, term, from, text) {
+    var list = [].concat(made).filter(Boolean);
+    var src = labelSpot(from, text);
+    var dst = term.getBoundingClientRect();
+    if (!src || !src.fs || !dst.width || M.reducedMotion()) return termIn(list);
+    var ops = list.filter(function (e) { return e !== term; });
+
+    var fly = term.cloneNode(true);
+    fly.removeAttribute('style');
+    fly.className = 'term term-fly';
+    fly.setAttribute('aria-hidden', 'true');
+    var ink = term.style.getPropertyValue('--c');
+    if (ink) fly.style.setProperty('--c', ink);
+    var cs = global.getComputedStyle(term);
+    ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight'].forEach(function (k) { fly.style[k] = cs[k]; });
+    document.body.appendChild(fly);
+    var nat = fly.getBoundingClientRect();
+    var w = nat.width || 1, hh = nat.height || 1;
+    var kTo = dst.width / w;                                    /* any scale the working is drawn at */
+    var kFrom = src.fs / (parseFloat(cs.fontSize) || src.fs);  /* the label's size, on screen */
+    var a = { x: src.x - w / 2, y: src.y - hh / 2 };
+    var b = { x: dst.left + dst.width / 2 - w / 2, y: dst.top + dst.height / 2 - hh / 2 };
+    /* the arc's top: above both ends, more for a longer carry */
+    var rise = Math.max(40, Math.min(140, Math.abs(b.x - a.x) * 0.28));
+    var c = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - rise };
+    var p = { t: 0 };
+    function place() {
+      var t = p.t, u = 1 - t;
+      M.set(fly, { x: u * u * a.x + 2 * u * t * c.x + t * t * b.x, y: u * u * a.y + 2 * u * t * c.y + t * t * b.y });
+    }
+    function gone() { if (fly.parentNode) fly.parentNode.removeChild(fly); }
+    M.set(fly, { x: a.x, y: a.y, scale: kFrom, rotation: 0, opacity: 0, transformOrigin: '50% 50%' });
+
+    var carry = FLY_LIFT * 0.8, land = carry + FLY_CARRY;
+    var tl = M.timeline({
+      willChange: fly, willChangeValue: 'transform, opacity',
+      revert: function () { gone(); M.set(list, { opacity: 1 }); }
+    });
+    /* picked up: it comes off the label, a size bigger, tipped as if held */
+    tl.to(fly, { opacity: 1, duration: M.dur(0.12), ease: 'power1.out' }, 0)
+      .to(fly, { scale: kFrom * 1.25, rotation: -7, duration: M.dur(FLY_LIFT), ease: 'power2.out' }, 0)
+      /* carried across, growing or shrinking to the working's size */
+      .to(p, { t: 1, duration: M.dur(FLY_CARRY), ease: 'power2.inOut', onUpdate: place }, M.gap(carry))
+      .to(fly, { scale: kTo * 1.16, rotation: 0, duration: M.dur(FLY_CARRY), ease: 'power1.inOut' }, M.gap(carry))
+      /* dropped in: it settles into its slot and the "+" before it pops up */
+      .to(fly, { scale: kTo, duration: M.dur(FLY_DROP), ease: 'back.out(2.4)' }, M.gap(land));
+    if (ops.length) {
+      tl.fromTo(ops, { opacity: 0, scale: 0.5 },
+        { opacity: 1, scale: 1, duration: M.dur(0.3), ease: 'back.out(1.8)' }, M.gap(land - 0.08));
+    }
+    tl.call(pop, null, M.gap(land))
+      .set(term, { opacity: 1 }, M.gap(land + FLY_DROP))
+      .call(gone, null, M.gap(land + FLY_DROP));
+    return tl;
+  }
+
+  /* ---- a result written again on the line under it ---------------------------
+     "= 3a" is copied: the copy lifts off its line, is carried straight down
+     onto the next and set in place there -- its "=" under the "=" it came
+     from -- and then its "a" drops away and "× side" rises in where it
+     stood. `src` is the line the result is on; `dst` the line under it,
+     laid out with both ends stacked in one place: `from` ("a") and `to`
+     (" × side"). Only transform and opacity move. */
+  function rewriteDown(src, dst, from, to) {
+    var finish = function () {
+      M.set(dst, { opacity: 1 }); M.set(from, { opacity: 0 }); M.set(to, { opacity: 1 });
+      from.setAttribute('aria-hidden', 'true');
+    };
+    var s = src.getBoundingClientRect(), d = dst.getBoundingClientRect();
+    if (!s.width || !d.width || M.reducedMotion()) {
+      var t0 = M.timeline({ revert: finish });
+      t0.call(finish);
+      return t0;
+    }
+    M.set(dst, { opacity: 0 });
+    M.set(from, { opacity: 1 });
+    M.set(to, { opacity: 0 });
+
+    /* the copy: a fixed-position twin of the line, in its own font and ink */
+    var fly = src.cloneNode(true);
+    fly.removeAttribute('style');
+    fly.className = 'term-fly steps-fly';
+    fly.setAttribute('aria-hidden', 'true');
+    var cs = global.getComputedStyle(src);
+    ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight', 'color'].forEach(function (k) { fly.style[k] = cs[k]; });
+    document.body.appendChild(fly);
+    var fs = parseFloat(cs.fontSize) || 20;
+    function gone() { if (fly.parentNode) fly.parentNode.removeChild(fly); }
+    M.set(fly, { x: s.left, y: s.top, opacity: 0, scale: 1, transformOrigin: '0% 50%' });
+
+    var down = d.top - s.top;
+    var tl = M.timeline({
+      willChange: [fly, from, to], willChangeValue: 'transform, opacity',
+      revert: function () { gone(); finish(); }
+    });
+    /* copied: the twin shows over the original, then lifts off it */
+    tl.set(fly, { opacity: 1 }, 0)
+      .to(fly, { scale: 1.1, y: s.top - fs * 0.12, duration: M.dur(0.2), ease: 'power2.out' }, M.gap(0.05))
+      /* carried down a line, "=" over "=" */
+      .to(fly, { x: d.left, y: d.top + down * 0.06, duration: M.dur(0.55), ease: 'power2.inOut' }, M.gap(0.25))
+      /* set in place */
+      .to(fly, { scale: 1, y: d.top, duration: M.dur(0.22), ease: 'back.out(2)' }, M.gap(0.8))
+      .call(pop, null, M.gap(0.8))
+      .set(dst, { opacity: 1 }, M.gap(1.02))
+      .call(gone, null, M.gap(1.02));
+    /* rewritten: the "a" swells, drops away, and "× side" rises into its place */
+    var at = 1.3;
+    tl.to(from, { scale: 1.3, duration: M.dur(0.18), ease: 'power2.out', transformOrigin: '50% 60%' }, M.gap(at))
+      .to(from, { opacity: 0, y: fs * 0.45, scale: 0.6, duration: M.dur(0.26), ease: 'power2.in' }, M.gap(at + 0.2))
+      .fromTo(to, { opacity: 0, y: -fs * 0.45, scale: 0.7, transformOrigin: '0% 60%' },
+        { opacity: 1, y: 0, scale: 1, duration: M.dur(0.42), ease: 'back.out(1.8)' }, M.gap(at + 0.36))
+      .call(pop, null, M.gap(at + 0.36));
+    return tl;
+  }
+
   /* The rule, set down as a pill: rises and settles. */
   function ruleIn(el) {
     var tl = M.timeline({ willChange: el, willChangeValue: 'transform, opacity' });
@@ -830,7 +1004,7 @@
    * Confetti
    * ====================================================================== */
   var BURST_N = 14;
-  var HUES = ['blue', 'mint', 'lavender', 'berry', 'gold'];
+  var HUES = ['sky', 'orange', 'lavender', 'pink', 'yellow', 'periwinkle'];
   function confetti(host, x, y) {
     var bits = [];
     for (var i = 0; i < BURST_N; i++) {
@@ -857,7 +1031,7 @@
     return tl;
   }
   var RAIN_N = 34;
-  var RAIN_HUES = ['blue', 'mint', 'lavender', 'berry', 'gold', 'snow'];
+  var RAIN_HUES = ['sky', 'orange', 'lavender', 'pink', 'yellow', 'periwinkle', 'snow'];
   function confettiRain(host) {
     var layer = document.createElement('div');
     layer.className = 'confetti';
@@ -896,6 +1070,7 @@
     labelsIn: labelsIn, labelIn: labelIn, labelsOut: labelsOut, marksOut: marksOut,
     lightSide: lightSide, unlightSide: unlightSide, unlightAll: unlightAll,
     pulseHold: pulseHold, pulseRelease: pulseRelease, partPulse: partPulse,
+    ticksIn: ticksIn, ticksOut: ticksOut,
     perimOn: perimOn, areaOn: areaOn, highlightOff: highlightOff,
     walk: walk, morphShape: morphShape, moveGroup: moveGroup, slideGroup: slideGroup, pushSide: pushSide,
     zonesIn: zonesIn, zonesOut: zonesOut, zoneLean: zoneLean, zoneRight: zoneRight, zoneWrong: zoneWrong,
@@ -904,7 +1079,7 @@
     trayIn: trayIn, trayOut: trayOut, choiceRight: choiceRight, choiceWrong: choiceWrong,
     optsIn: optsIn, optsOut: optsOut,
     chipHome: chipHome, chipDock: chipDock,
-    cardIn: cardIn, cardsIn: cardsIn, cardOut: cardOut, rowIn: rowIn, termIn: termIn, ruleIn: ruleIn, emphasise: emphasise,
+    cardIn: cardIn, cardsIn: cardsIn, cardOut: cardOut, rowIn: rowIn, termIn: termIn, termFly: termFly, rewriteDown: rewriteDown, ruleIn: ruleIn, emphasise: emphasise,
     lightsOn: lightsOn,
     clearFigure: clearFigure,
     bubbleArm: bubbleArm, bubbleIn: bubbleIn, bubbleOut: bubbleOut,

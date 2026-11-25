@@ -139,6 +139,22 @@
       </div>
       <button class="start-btn" id="startBtn" type="button" hidden data-i18n="btnStart">Start</button>
     </section>
+
+    <!-- A phone held upright: turn it sideways to play (css/style.css shows
+         it only then; the lesson waits behind it). -->
+    <section class="rotate" id="rotate" role="alert">
+      <div class="rotate__bird" aria-hidden="true"></div>
+      <svg class="rotate__phone" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <g class="rotate__device">
+          <rect x="32" y="14" width="36" height="72" rx="7" fill="var(--snow)" stroke="var(--ink)" stroke-width="5" />
+          <rect x="38" y="22" width="24" height="52" rx="2" fill="var(--ice-3)" />
+          <circle cx="50" cy="80" r="2.6" fill="var(--ink)" />
+        </g>
+        <path d="M82 40 A34 34 0 0 1 60 84" fill="none" stroke="var(--gold-deep)" stroke-width="5" stroke-linecap="round" />
+        <path d="M58 76 L60 85 L69 83" fill="none" stroke="var(--gold-deep)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <p class="rotate__text" data-i18n="uiRotate">Please turn your device sideways to play.</p>
+    </section>
   </main>
 
   <script src="js/libs/gsap.min.js"></script>

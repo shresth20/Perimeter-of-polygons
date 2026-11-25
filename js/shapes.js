@@ -18,7 +18,7 @@
   'use strict';
 
   var NS = 'http://www.w3.org/2000/svg';
-  var SIDE_INKS = 8;                /* --side-0 .. --side-7 in style.css */
+  var SIDE_INKS = 6;                /* --side-0 .. --side-5 in style.css */
 
   function round2(n) { return Math.round(n * 100) / 100; }
   function el(tag, attrs) {
@@ -86,7 +86,7 @@
      label is never pushed off by the empty room above and below its
      letters, and a wide one never runs into its side. */
   var SIDE_HALF = 2.5;              /* half a side's stroke (.shape__side)       */
-  var HALO = 2.5;                   /* half a label's white halo (.figure-label) */
+  var HALO = 2.5;                   /* a little clear room kept round a label's letters */
   var GAP_EM = 0.45;                /* the clear gap, in the label's own ems     */
   var FALLBACK_PX = 26;             /* .figure-label, for a shape not yet on the page */
   var PUSH_STEP = 3, PUSH_MAX_EM = 3;
@@ -236,6 +236,42 @@
     }
   }
 
+  /* ---- equal sides, marked ---------------------------------------------------
+     The geometry book's sign for "these sides are the same length": a short
+     stroke across the middle of each -- one stroke on every side of the first
+     set of equal sides, two on the next set, and so on. A side with no equal
+     is left unmarked, so a regular polygon has a stroke on every side and a
+     scalene one none. Lengths within TICK_SLACK (figure units) are equal. */
+  var TICK_SLACK = 0.5, TICK_LEN = 18, TICK_GAP = 7;
+  function tickCounts(s) {
+    var sets = [], counts = [];
+    for (var i = 0; i < s.n; i++) {
+      var L = s.len(i), found = null;
+      for (var j = 0; j < sets.length; j++) if (Math.abs(sets[j].len - L) <= TICK_SLACK) { found = sets[j]; break; }
+      if (!found) { found = { len: L, sides: [] }; sets.push(found); }
+      found.sides.push(i);
+    }
+    var k = 0;
+    sets.forEach(function (set) {
+      if (set.sides.length < 2) return;
+      k++;
+      set.sides.forEach(function (i2) { counts[i2] = k; });
+    });
+    return counts;
+  }
+  function tickPath(a, b, count) {
+    if (!count) return '';
+    var dx = b.x - a.x, dy = b.y - a.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+    var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, h = TICK_LEN / 2, d = [];
+    for (var j = 0; j < count; j++) {
+      var off = (j - (count - 1) / 2) * TICK_GAP;
+      var cx = mx + ux * off, cy = my + uy * off;
+      d.push('M' + round2(cx - nx * h) + ' ' + round2(cy - ny * h) + ' L' + round2(cx + nx * h) + ' ' + round2(cy + ny * h));
+    }
+    return d.join(' ');
+  }
+
   /* opts:
        inks     true: one ink per side LENGTH (--side-i; equal sides share
                 one, see above); a list of ink indices to use one per side;
@@ -250,18 +286,29 @@
        hits     true: a tappable band over each side
        vertices true: a draggable dot on each corner
        perim/area  the warm-up's two highlights
-       name     a word written under the shape (a key, read through T) */
+       ticks    true: equal sides marked with strokes across them (above);
+                hidden until a beat shows them (Beats.ticksIn)
+       tint     an ink index: the inside washed in a light shade of that
+                ink (--side-i), so a shape outlined in its colour is not
+                left a pale ice blue inside
+       name     a word written under the shape (a key, read through T);
+                nameAbove: true writes it over the shape instead, nameGap
+                from the shape's top (default 40, the same either way) */
   function build(host, pts, opts) {
     var o = opts || {};
     var g = el('g', { 'class': 'shape' + (o.cls ? ' ' + o.cls : '') });
     if (o.id) g.setAttribute('id', o.id);
+    if (o.tint != null) {
+      g.classList.add('shape--tint');
+      g.style.setProperty('--tint', 'var(--side-' + (o.tint % SIDE_INKS) + ')');
+    }
     var n = pts.length;
     var s = {
       g: g, pts: pts.slice(), n: n, opts: o,
       fill: el('path', { 'class': 'shape__fill' }),
       area: o.area ? el('path', { 'class': 'shape__area' }) : null,
       perim: o.perim ? el('path', { 'class': 'shape__perim' }) : null,
-      sides: [], hits: [], labels: [], vertices: [], vhits: [], inks: [], inkMap: null,
+      sides: [], hits: [], labels: [], vertices: [], vhits: [], ticks: [], inks: [], inkMap: null,
       outline: el('path', { 'class': 'shape__outline' }),
       tip: el('circle', { 'class': 'shape__tip', r: 7 }),
       hitbox: o.hitbox ? el('path', { 'class': 'shape__hitbox' }) : null,
@@ -276,6 +323,13 @@
       s.sides.push(side);
     }
     if (s.perim) g.appendChild(s.perim);
+    if (o.ticks) {
+      for (i = 0; i < n; i++) {
+        var tk = el('path', { 'class': 'shape__tick' });
+        g.appendChild(tk);
+        s.ticks.push(tk);
+      }
+    }
     if (o.hits) {
       for (i = 0; i < n; i++) {
         var hit = el('path', { 'class': 'shape__hit', role: 'button', tabindex: -1 });
@@ -353,10 +407,12 @@
       if (s.perim) s.perim.setAttribute('d', d);
       if (s.hitbox) s.hitbox.setAttribute('d', d);
       var placed = [];
+      var marks = s.ticks.length ? tickCounts(s) : null;
       for (var i = 0; i < s.n; i++) {
         var sd = seg(p[i], p[(i + 1) % s.n]);
         s.sides[i].setAttribute('d', sd);
         if (s.hits[i]) s.hits[i].setAttribute('d', sd);
+        if (marks) s.ticks[i].setAttribute('d', tickPath(p[i], p[(i + 1) % s.n], marks[i]));
         if (s.labels[i]) {
           var txt = String(s.labelText(i));
           s.labels[i].textContent = txt;
@@ -370,14 +426,15 @@
       var top = p[0];
       s.tip.setAttribute('cx', top.x); s.tip.setAttribute('cy', top.y);
       if (s.name) {
-        var c = centroid(p), low = 0;
-        p.forEach(function (q) { low = Math.max(low, q.y); });
+        var c = centroid(p), low = -Infinity, high = Infinity;
+        p.forEach(function (q) { low = Math.max(low, q.y); high = Math.min(high, q.y); });
+        var nameGap = o.nameGap == null ? 40 : o.nameGap;
         s.name.setAttribute('x', c.x);
-        s.name.setAttribute('y', low + (o.nameGap == null ? 40 : o.nameGap));
+        s.name.setAttribute('y', o.nameAbove ? high - nameGap : low + nameGap);
       }
       paintInks(s);
     };
-    /* The ink side i wears (an index into --side-0..7), for the working that
+    /* The ink side i wears (an index into --side-0..5), for the working that
        writes its length in the same colour; null for a one-line shape. */
     s.ink = function (i) { return s.inks[i] == null ? null : s.inks[i]; };
     s.set(pts);
@@ -388,7 +445,7 @@
   }
 
   global.Shapes = {
-    NS: NS, el: el, round2: round2,
+    NS: NS, el: el, round2: round2, INKS: SIDE_INKS,
     regular: regular, rect: rect, pathOf: pathOf, seg: seg, dist: dist,
     centroid: centroid, outward: outward, labelAt: labelAt, build: build
   };

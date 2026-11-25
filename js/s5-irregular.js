@@ -41,7 +41,7 @@
   /* The heptagon's facts, on a card under the bird (the perch owns it, and
      takes it away with it). */
   function infoCard(title, rows) {
-    var card = h('div', 'card', K.perchRow());
+    var card = h('div', 'card card--info', K.perchRow());
     var t = h('p', 'card__title', card); t.textContent = T(title);
     rows.forEach(function (r) { var e = h('div', 'card__row is-soft', card); e.textContent = T(r); });
     return card;
@@ -158,9 +158,11 @@
       .then(function () { return K.handOver(); })
 
       /* ---- the question, asked from the same spot ---------------------------
-         As every question with answers to tap is: the bird on the right with
-         the question in its bubble, three answers under it, every verdict in
-         the same bubble; a right answer makes way for the working
+         As every question with answers to tap is (s2-basics.js): the bird on
+         the right with the question kept in its bubble, three answers under
+         it, every verdict heard only -- a wrong one shakes and the answers
+         are shuffled out of sight, and after three wrong tries the answer is
+         shown; a right (or shown) answer makes way for the working
          ("Perimeter:" over the sum) as the light walks the boundary. The
          bird is already there, so the facts make way and it simply asks. */
       .then(function () { return K.perchClear(); })
@@ -168,20 +170,22 @@
       .then(function () { return K.perchChoices([28, 30, 26].map(cm)); })
       .then(function (btns) {
         return K.perchAsk(btns, 1, {
-          onWrong: function (k) { return K.perchSay({ 0: 'i2Wrong28', 2: 'i2Wrong26' }[k] || 'bWrongGeneric', 'confused', 'no'); }
+          onWrong: function () { return K.perchHear('bNotQuite', 'confused'); }
         });
       })
       .then(function (res) {
-        var told = K.perchRight('i2Right', res);
-        var work = Flow.wait(BEAT)
+        var told = res.revealed ? K.perchHear('i2Reveal') : K.perchHear('i2Right', 'happy');
+        /* a revealed answer is left lit a moment longer: the learner did not find it */
+        var work = Flow.wait(res.revealed ? LOOK : BEAT)
           .then(function () { return K.perchClear(); })
           .then(function () {
             sum = K.perchSum(T('lblPerimeterIs'), { terms: SUM, total: '= ' + cm(30) });
             return Flow.anim(Beats.cardIn(sum.el));
           })
           .then(function () {
-            return Flow.anim(Beats.walk(shape, 3.2, {
-              onSide: function (k) { Beats.lightSide(shape, k, { label: true }); sum.term(String(SUM[k]), shape.ink(k)); }
+            /* each side's length carried off its label into the sum */
+            return Flow.anim(Beats.walk(shape, 0.7 * SUM.length, {
+              onSide: function (k) { Beats.lightSide(shape, k, { label: true }); sum.term(String(SUM[k]), shape.ink(k), shape.labels[k]); }
             }));
           })
           .then(function () { return sum.total('= ' + cm(30)); })

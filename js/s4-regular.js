@@ -36,13 +36,20 @@
   function aside(g) {
     return Flow.anim(Beats.moveGroup(g, { x: ASIDE_X - MID_X }, 0.9, 'power3.inOut'));
   }
-  /* The working under the bird: the sum ("a + a + a", landing a term at a
-     time), then "= 3a" and "= 3 × side". Every row is laid out up front,
-     unseen, so the card is its final size from the start and nothing in it
-     moves as the rows come in. */
+  /* The working under the bird (W.stepsCard): the sum on one line with
+     what it comes to -- "a + a + a = 3a", each side's "a" carried off its
+     label on the shape and dropped in, a term at a time -- and under it a
+     copy of "= 3a" with its "a" rewritten "× side": "= 3 × side", the two
+     "=" one above the other. Laid out up front, unseen, so the card is its
+     final size from the start and nothing in it moves as it fills. */
   function workCard(n, eq, rule) {
-    var card = K.perchSum(null, { terms: aLabels(n) }, 'card--steps');
-    return { card: card, eq: card.row(T(eq), 'is-result'), rule: card.row(T(rule), 'is-soft') };
+    return K.perchSteps({ terms: aLabels(n), eq: T(eq), rule: T(rule) });
+  }
+  /* Every "a" in: "= 3a" ends the line, then is written again under it. */
+  function finishWork(w) {
+    return w.equals()
+      .then(function () { return Flow.wait(SHORT); })
+      .then(function () { return w.rewrite(); });
   }
   /* Next pressed: the bird drops away with its bubble and the working, and
      the shape goes, all at once. */
@@ -55,7 +62,7 @@
   /* ---- page 1: the triangle, tapped --------------------------------------- */
   function pageTriangle() {
     var g = S.el('g'); group.appendChild(g);
-    var shape = S.build(g, S.regular(3, MID_X, 236, 162), { inks: true, labels: aLabels(3), hits: true, cls: 'shape--big' });
+    var shape = S.build(g, S.regular(3, MID_X, 236, 162), { inks: true, labels: aLabels(3), hits: true, cls: 'shape--big shape--letters' });
     var w = null;
     var stopHand = null, touched = false;
     /* the header stays shut: the bird speaks from beside the shape */
@@ -70,7 +77,7 @@
       .then(function () { return Flow.wait(SHORT); })
       .then(function () {
         w = workCard(3, 'lblEq3a', 'lblEq3side');
-        return Flow.anim(Beats.cardIn(w.card.el));
+        return Flow.anim(Beats.cardIn(w.el));
       })
       .then(function () { return K.perchSay('r1Walk'); })
       .then(function () {
@@ -79,14 +86,14 @@
           onTap: function (i) {
             touched = true;
             if (stopHand) { stopHand(); stopHand = null; }
+            /* a tapped side changes colour: it turns the perimeter's yellow */
+            shape.sides[i].classList.add('is-tapped');
             Beats.lightSide(shape, i, { label: true });
-            w.card.term('a', shape.ink(i));
+            w.term('a', shape.ink(i), shape.labels[i]);
           }
         });
       })
-      .then(function () { if (stopHand) stopHand(); return Flow.wait(SHORT); })
-      .then(function () { return w.eq.show(); })
-      .then(function () { return w.rule.show(); })
+      .then(function () { if (stopHand) stopHand(); return finishWork(w); })
       .then(function () {
         var c = shape.centre(); K.burstAt(c.x + ASIDE_X - MID_X, c.y);
         return K.perchSay('r1Done', 'happy');
@@ -98,7 +105,7 @@
   /* ---- pages 2 and 3: the square and the pentagon, walked ------------------ */
   function pageWalked(o) {
     var g = S.el('g'); group.appendChild(g);
-    var shape = S.build(g, o.pts, { inks: true, labels: aLabels(o.pts.length), cls: 'shape--big' });
+    var shape = S.build(g, o.pts, { inks: true, labels: aLabels(o.pts.length), cls: 'shape--big shape--letters' });
     var w = null;
     return Flow.anim(K.collapseHeader(true))
       .then(function () { return Flow.anim(Beats.drawShape(shape, { time: 1.2 })); })
@@ -109,45 +116,46 @@
       .then(function () { return K.perchUp(); })
       .then(function () {
         w = workCard(o.pts.length, o.eq, o.rule);
-        return Flow.anim(Beats.cardIn(w.card.el));
+        return Flow.anim(Beats.cardIn(w.el));
       })
       .then(function () {
-        return Flow.anim(Beats.walk(shape, 2.2, {
-          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); w.card.term('a', shape.ink(k)); }
+        return Flow.anim(Beats.walk(shape, 0.75 * shape.n, {
+          onSide: function (k) { Beats.lightSide(shape, k, { label: true }); w.term('a', shape.ink(k), shape.labels[k]); }
         }));
       })
-      .then(function () { return w.eq.show(); })
-      .then(function () { return w.rule.show(); })
+      .then(function () { return finishWork(w); })
       .then(function () { return K.perchSay(o.say); })
       .then(function () { return K.handOver(); })
       .then(function () { return clearPage(g); });
   }
 
   /* ---- page 4: the pattern ------------------------------------------------- */
-  function miniShape(pts) {
+  /* Each shape filling its little picture (120 x 110), so it reads at the
+     size of the words beside it, in an ink of its own -- the line in the
+     ink, the inside a light shade of it -- and its "3 sides" in the same ink. */
+  function miniShape(pts, k) {
     var svg = S.el('svg', { viewBox: '0 0 120 110' });
-    S.build(svg, pts, { inks: true });
+    S.build(svg, pts, { inks: [k], tint: k });
     return svg;
   }
   function pagePattern() {
     var table = h('div', 'ptable', dom.layer);
     layerNodes.push(table);
-    var head = h('p', 'ptable__head', table); head.textContent = T('r4Title');
     var rows = [
-      { pts: S.regular(3, 60, 60, 46), name: 'r4Row1Name', sides: 'r4Row1Sides', eq: 'r4Row1Eq' },
-      { pts: S.rect(22, 17, 76, 76), name: 'r4Row2Name', sides: 'r4Row2Sides', eq: 'r4Row2Eq' },
-      { pts: S.regular(5, 60, 58, 46), name: 'r4Row3Name', sides: 'r4Row3Sides', eq: 'r4Row3Eq' }
-    ].map(function (r) {
+      { pts: S.regular(3, 60, 66, 58), name: 'r4Row1Name', sides: 'r4Row1Sides', eq: 'r4Row1Eq' },
+      { pts: S.rect(14, 9, 92, 92), name: 'r4Row2Name', sides: 'r4Row2Sides', eq: 'r4Row2Eq' },
+      { pts: S.regular(5, 60, 59, 54), name: 'r4Row3Name', sides: 'r4Row3Sides', eq: 'r4Row3Eq' }
+    ].map(function (r, k) {
       var card = h('div', 'card', table);
-      card.appendChild(miniShape(r.pts));
+      card.appendChild(miniShape(r.pts, k));
       var n = h('span', 'ptable__name', card); n.textContent = T(r.name);
       var s = h('span', 'ptable__sides', card); s.textContent = T(r.sides);
+      s.style.setProperty('--c', 'var(--side-' + k + ')');
       var e = h('span', 'ptable__eq', card); global.MathText.write(e, T(r.eq));
       return card;
     });
     return K.birdAway()
       .then(function () { return Flow.anim(K.collapseHeader(true)); })
-      .then(function () { return Flow.anim(Beats.rowIn(head)); })
       .then(function () { return Flow.anim(Beats.cardsIn(rows, 0.3)); })
       .then(function () { return Flow.wait(LOOK); })
       .then(function () { return K.speakBySentence('r4Say'); })
@@ -167,8 +175,9 @@
         group.removeAttribute('hidden');
         return DRAG.reduce(function (chain, f) {
           return chain.then(function () {
-            var s = S.build(group, S.regular(f.n, f.cx, 138, 70), { inks: true, inkFrom: shapes.length, labels: aLabels(f.n), name: f.name, nameGap: 58 });
-            s.labels.forEach(function (l) { l.setAttribute('font-size', '20'); });
+            /* each name written over its polygon */
+            var s = S.build(group, S.regular(f.n, f.cx, 184, 82), { inks: true, inkFrom: shapes.length, labels: aLabels(f.n),
+              name: f.name, nameAbove: true, nameGap: 50, cls: 'shape--trio' });
             shapes.push(s);
             return Flow.anim(Beats.drawShape(s, { time: 0.7 })).then(function () {
               return Flow.anim(Beats.labelsIn(s.labels.concat([s.name]), 0.06));
@@ -177,7 +186,7 @@
         }, Promise.resolve());
       })
       .then(function () {
-        boxes = DRAG.map(function (f) { return K.buildBox(group, { name: f.opt, x: f.cx - 80, y: 304, w: 160 }); });
+        boxes = DRAG.map(function (f) { return K.buildBox(group, { name: f.opt, x: f.cx - 80, y: 320, w: 160 }); });
         return boxes.reduce(function (chain, b) { return chain.then(function () { return Flow.anim(Beats.boxIn(b)); }); }, Promise.resolve());
       })
       .then(function () {

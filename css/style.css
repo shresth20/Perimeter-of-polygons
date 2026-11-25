@@ -50,15 +50,28 @@
   --orange:     #F7A043;
   --orange-deep:#D9741A;
 
-  /* ---- the sides of a shape: one ink per side, in this order ---------- */
-  --side-0: var(--ice-ink);
-  --side-1: var(--mint-deep);
-  --side-2: var(--lavender-deep);
-  --side-3: var(--berry-deep);
-  --side-4: var(--gold-deep);
-  --side-5: var(--pink-deep);
-  --side-6: var(--teal-deep);
-  --side-7: var(--orange-deep);
+  /* ---- the figure palette ------------------------------------------------
+     Every side of a shape, the label written beside it, its term in the
+     working, and the confetti. Green (#18D6A0, #B7EA33) and red (#FF6A58)
+     are kept out of it on purpose: in this game they mean right and wrong,
+     and nothing decorative wears them. */
+  --fig-periwinkle: #6F8BFF;
+  --fig-orange:     #FFA93A;
+  --fig-pink:       #FF6FA8;
+  --fig-lavender:   #C48AFF;
+  --fig-sky:        #3BC6FF;
+  --fig-yellow:     #FFDF50;
+
+  /* ---- the sides of a shape: one ink per side LENGTH, in this order ------
+     The most distinct inks first, so a shape of two or three lengths (a
+     rectangle, a triangle) never needs the pale ones. Six inks:
+     js/shapes.js SIDE_INKS counts them. */
+  --side-0: var(--fig-periwinkle);
+  --side-1: var(--fig-orange);
+  --side-2: var(--fig-pink);
+  --side-3: var(--fig-lavender);
+  --side-4: var(--fig-sky);
+  --side-5: var(--fig-yellow);
 
   /* ---- right and wrong ------------------------------------------------- */
   --right-fill:   #7BE49A;
@@ -70,8 +83,13 @@
   --shape-fill:      color-mix(in srgb, var(--ice-3) 42%, var(--snow));
   --shape-fill-deep: color-mix(in srgb, var(--ice-deep) 38%, var(--snow));
   --shape-line:      var(--ink);
-  --area-wash:       var(--ice-ink);   /* the lit inside: darker than its rim  */
-  --area-rim:        var(--ice-3);     /* the lit inside's outline, kept light */
+  --shape-black:     var(--ink);       /* the polygons drawn alike (sections 4-5), and
+                                          the strokes marking equal sides: the
+                                          game's own dark blue, not black */
+  /* The warm-up's one colour pair, the same on every shape: the perimeter
+     is a yellow boundary, the area a light blue inside. */
+  --area-wash:       var(--ice-3);     /* the lit inside: a light blue          */
+  --area-rim:        color-mix(in srgb, var(--ice-deep) 45%, var(--ice-3)); /* its edge, plain */
   --perim-glow:      var(--gold);
 
   /* ---- surfaces --------------------------------------------------------- */
@@ -79,15 +97,16 @@
   --board-rim:  var(--snow);
   --frost-line: color-mix(in srgb, var(--ice-deep) 22%, transparent);
 
-  /* The centre-stage bubble (welcome, interludes, the end): warm yellow on
-     the icy lake, in the gold of Start and the cabin's light. The perch's
-     bubble keeps its own ice colours (.bubble--perch). */
-  --bubble-bg:       #FFF2A8;
-  --bubble-rim:      var(--gold);
+  /* The centre-stage bubble (welcome, interludes, the end): a pale, light
+     yellow on the icy lake, a softened gold of Start and the cabin's light.
+     The glow is kept faint so it does not wash yellow over the bird. The
+     perch's bubble keeps its own ice colours (.bubble--perch). */
+  --bubble-bg:       #FFF8D9;
+  --bubble-rim:      color-mix(in srgb, var(--gold) 80%, var(--snow));
   --bubble-ink:      var(--ink);
   --bubble-shine:    var(--snow);
-  --bubble-glow:     color-mix(in srgb, var(--gold) 50%, transparent);
-  --bubble-glow-dim: color-mix(in srgb, var(--gold) 22%, transparent);
+  --bubble-glow:     color-mix(in srgb, var(--gold) 28%, transparent);
+  --bubble-glow-dim: color-mix(in srgb, var(--gold) 10%, transparent);
 
   --page-bg:      var(--ice-3);
   --page-bg-deep: var(--ice-deep);
@@ -141,10 +160,14 @@
   --z-next: 6;
   --z-welcome: 9;
 
+  /* The board's width. Everything set on the board is sized from it, not
+     from the screen's height or width, so the lesson keeps its proportions
+     on every screen (a 4:3 tablet, a phone on its side, a wide monitor);
+     the factors were taken from a 16:9 screen, where the board is 160vh. */
   --board-w: min(1500px, 96vw, 160vh);
   --row-top: 16%;
   --row-bottom: 11%;
-  --board-pad-y: clamp(10px, 2.2vh, 22px);
+  --board-pad-y: clamp(10px, calc(var(--board-w) * .01375), 22px);
   --board-pad-x: clamp(18px, calc(var(--board-w) * .032), 44px);
   --stage-full-h: calc(var(--board-w) * 9 / 16 - 2 * var(--board-pad-y) - 6px);
   --stage-full-w: calc(var(--board-w) - 2 * var(--board-pad-x) - 6px);
@@ -218,7 +241,7 @@ body {
   display: grid;
   grid-template-rows: var(--row-top) minmax(0, 1fr) var(--row-bottom);
   padding: var(--board-pad-y) var(--board-pad-x);
-  border-radius: clamp(20px, 3.6vh, 36px);
+  border-radius: clamp(20px, calc(var(--board-w) * .0225), 36px);
   border: 3px solid var(--board-rim);
   background:
     linear-gradient(180deg,
@@ -306,7 +329,7 @@ body {
   text-align: left;
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: clamp(17px, 3.3vh, 32px);
+  font-size: clamp(17px, calc(var(--board-w) * .0206), 32px);
   line-height: 1.22;
   color: var(--ink);
 }
@@ -339,16 +362,14 @@ body {
 .layer > * { pointer-events: auto; }
 .layer[hidden] { display: none; }
 
-/* Every word set on the figure. User units, so it scales with the shape. */
+/* Every word set on the figure. User units, so it scales with the shape.
+   Flat letters in their own colour: no white halo round them. */
 .figure-label {
   font-family: var(--font-display);
   font-size: 26px;
   letter-spacing: .3px;
   fill: var(--ink);
-  paint-order: stroke fill;
-  stroke: var(--snow);
-  stroke-width: 5;
-  stroke-linejoin: round;
+  stroke: none;
 }
 
 /* ==========================================================================
@@ -382,7 +403,7 @@ body {
     0 calc(var(--edge) + 3px) 10px var(--shadow-soft);
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: clamp(13px, min(3.1vh, 2vw), 27px);
+  font-size: clamp(13px, calc(var(--board-w) * .0194), 27px);
   line-height: 1.1;
   letter-spacing: .4px;
   color: var(--ink);
@@ -397,8 +418,11 @@ body {
   justify-content: center;
   min-height: 2.4em;
   padding-inline: 1.4em;
-  font-size: clamp(14px, min(3.2vh, 2.2vw), 28px);
+  font-size: clamp(16px, calc(var(--board-w) * .023), 32px);
 }
+/* the answer's words: hidden and rewritten while the pill stays put
+   (pages.js perchAsk) */
+.choice__txt { display: inline-block; pointer-events: none; }
 .chip:hover, .choice:hover { filter: brightness(1.03); }
 .chip:focus-visible, .choice:focus-visible { outline: none; border-color: var(--ice-ink); }
 .chip.is-lifted {
@@ -450,7 +474,7 @@ body {
   z-index: var(--z-next);
   display: grid;
   place-items: center;
-  width: clamp(72px, 13vh, 132px);
+  width: clamp(56px, calc(var(--board-w) * .081), 132px);
   aspect-ratio: 1;
   padding: 0;
   border: 0;
@@ -486,7 +510,7 @@ body {
   background: linear-gradient(180deg, var(--snow) 0%, var(--pill-face-mid) 55%, var(--pill-face-low) 100%);
   box-shadow: 0 var(--edge) 0 var(--pill-wall), 0 calc(var(--edge) + 3px) 10px var(--shadow-soft);
   font-family: var(--font-display);
-  font-size: clamp(14px, 2.6vh, 24px);
+  font-size: clamp(14px, calc(var(--board-w) * .01625), 24px);
   color: var(--ink);
   cursor: pointer;
   translate: 0 var(--sink);
@@ -641,7 +665,7 @@ body {
 }
 .perch__answers .choice {
   pointer-events: auto;
-  font-size: clamp(12px, 4cqw, 26px);
+  font-size: clamp(14px, 4.6cqw, 30px);
   padding: .36em .95em .42em;
 }
 /* A spent pill -- refused, or passed over once the answer is in -- is not a
@@ -936,3 +960,67 @@ body {
 .start-btn.in { opacity: 1; transform: none; animation: start-pulse 2.1s ease-in-out .5s infinite; }
 .start-btn.in:hover, .start-btn.in:focus-visible { animation-play-state: paused; filter: brightness(1.04); outline: none; }
 .start-btn.is-3d { transition: opacity .42s ease, transform .42s cubic-bezier(.2, .9, .3, 1.4), filter .18s ease; }
+
+/* ==========================================================================
+   Turn it sideways -- a phone held upright
+   The lesson is a 16:9 board: on a phone held upright it would shrink to a
+   strip too small to read or tap, so instead this covers everything and
+   asks for the phone to be turned. Tablets held upright still play (the
+   board fits their width). It goes the moment the phone is turned.
+   ========================================================================== */
+.rotate { display: none; }
+@media (orientation: portrait) and (max-width: 599px) {
+  .rotate {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 14px;
+    padding: 24px 16px;
+    text-align: center;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--snow) 30%, transparent), color-mix(in srgb, var(--ice-deep) 35%, transparent)),
+      var(--art-page) center / cover no-repeat,
+      var(--page-bg);
+  }
+}
+/* Swiftee, standing still: the first frame of its idle sheet (7 x 6). */
+.rotate__bird {
+  width: min(46vw, 220px);
+  aspect-ratio: 1;
+  background: url("../assets/swiftee-assets/spritesheets/2x/swiftee_blinking@2x.webp") 0 0 / 700% 600% no-repeat;
+}
+.rotate__phone {
+  width: min(24vw, 110px);
+  height: auto;
+  overflow: visible;
+}
+.rotate__device {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: rotate-hint 2.4s ease-in-out infinite;
+}
+@keyframes rotate-hint {
+  0%, 20%   { transform: rotate(0deg); }
+  50%, 80%  { transform: rotate(-90deg); }
+  100%      { transform: rotate(0deg); }
+}
+.rotate__text {
+  margin: 0;
+  max-width: 18em;
+  padding: .5em .9em;
+  border: 4px solid var(--bubble-rim);
+  border-radius: .66em;
+  background: var(--bubble-bg);
+  box-shadow: 0 10px 26px var(--shadow-soft);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(17px, 5.2vw, 24px);
+  line-height: 1.25;
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rotate__device { animation: none; }
+}

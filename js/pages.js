@@ -152,18 +152,24 @@
       return b;
     });
   }
+  /* Each answer's words in a span of their own, so they can be hidden and
+     rewritten while the pill itself stays put (perchAsk's shuffle). */
   function buildChoices(host, labels) {
     host.textContent = '';
     return labels.map(function (text) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'choice';
-      global.MathText.write(b, text);
+      var t = document.createElement('span');
+      t.className = 'choice__txt';
+      b.appendChild(t);
+      global.MathText.write(t, text);
       b.dataset.name = text;
       host.appendChild(b);
       return b;
     });
   }
+  function choiceText(btn) { return btn.querySelector('.choice__txt') || btn; }
   function shuffle(list) {
     var a = list.slice();
     for (var tries = 0; tries < 8; tries++) {
@@ -734,9 +740,12 @@
     var room = row.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
              - (parseFloat(cs.columnGap || cs.gap) || 0) * (btns.length - 1);
     var same = w * btns.length <= room;
+    /* in the pill's own ems, not pixels: the pills are sized against the
+       pane, so a turned tablet or a resized window scales them with it */
     btns.forEach(function (b) {
-      if (same) b.style.minWidth = Math.ceil(w) + 'px';
-      b.style.minHeight = Math.ceil(hh) + 'px';
+      var fs = parseFloat(getComputedStyle(b).fontSize) || 16;
+      if (same) b.style.minWidth = (Math.ceil(w) / fs).toFixed(3) + 'em';
+      b.style.minHeight = (Math.ceil(hh) / fs).toFixed(3) + 'em';
     });
     return Flow.anim(Beats.optsIn(btns)).then(function () { return btns; });
   }
@@ -769,54 +778,83 @@
     return W.sumCard(perchRow(), { title: title, reserve: reserve,
       cls: 'card--perch' + (long ? ' card--long' : '') + (cls ? ' ' + cls : '') });
   }
+  /* The steps card under the bird (W.stepsCard): "a + a + a = 3a" over
+     "= 3 × side", the "=" signs one above the other. */
+  function perchSteps(o) {
+    return W.stepsCard(perchRow(), { terms: o.terms, eq: o.eq, rule: o.rule, cls: 'card--perch' });
+  }
 
   /* ---- the question under the bird ---------------------------------------
-     The circle game's press (circum.js armChoices), on the perch's pills:
-       a wrong pill is spent -- it shakes, goes red and stays so -- and no
-       pill is live until `o.onWrong(i)`, the saying of why (a promise), is
-       over; then it steps back and the learner tries again among the rest.
-       Once only the answer is left, the wait ends and the answer is lit for
-       the learner, without the chime. The right one goes green; either way
-       the others step back from it, so the green one is what the eye is
-       left on. Resolves { tries, auto } -- `auto` when it was put in. */
-  var AUTO_AFTER = 500;   /* ms: the last wrong pill stepped back first */
+     The question stays in the bubble the whole time: no verdict is written
+     over it -- each is heard (o.onWrong, a promise: the "Not quite!" line,
+     and perchHear for the right answer's line).
+       A wrong pill shakes and goes red. Then the answers are shuffled where
+     the learner cannot see it happen: the pills stay where they are, only
+     their numbers go for a moment and come back in a new order, every pill
+     plain again. No pill is live until the wrong line is over; then every
+     one is (a wrong answer is not spent -- it may be anywhere now).
+       After MAX_TRIES wrong taps the answer is revealed for the learner. The
+     right one goes green; either way the others step back from it, so the
+     green one is what the eye is left on. Resolves { tries, revealed }. */
+  var MAX_TRIES = 3;
+  var SHUFFLE_GONE = 0.8;    /* s: the numbers away, while they are shuffled */
+  function reshuffle(btns) {
+    var labels = shuffle(btns.map(function (b) { return b.dataset.name; }));
+    var txts = btns.map(choiceText);
+    var tl = M.timeline({ willChange: txts, willChangeValue: 'opacity' });
+    tl.to(txts, { opacity: 0, duration: M.dur(0.2), ease: 'power2.in' })
+      .call(function () {
+        btns.forEach(function (b, i) {
+          b.classList.remove('is-wrong');
+          b.dataset.name = labels[i];
+          global.MathText.write(choiceText(b), labels[i]);
+        });
+      })
+      .to(txts, { opacity: 1, duration: M.dur(0.28), ease: 'power2.out' }, '+=' + M.dur(SHUFFLE_GONE));
+    return tl;
+  }
   function perchAsk(btns, right, o) {
     o = o || {};
     var P = perch;
-    var answer = btns[right];
-    var live = true, busy = false, tries = 0, auto = false;
+    var key = btns[right].dataset.name;
+    var most = o.tries || MAX_TRIES;
+    var live = true, busy = false, tries = 0, wrongs = 0, revealed = false;
     function hearing(on) { if (P) P.answers.classList.toggle('is-hearing', on); }
+    function answerBtn() {
+      for (var i = 0; i < btns.length; i++) if (btns[i].dataset.name === key) return btns[i];
+      return btns[right];
+    }
     function onPick(ev) {
       if (!live || busy) return;
       var btn = ev.currentTarget;
-      if (btn.classList.contains('is-done')) return;
       ripple(ev, btn);
       tries++;
-      if (btn === answer) {
+      if (btn.dataset.name === key) {
         live = false;
         Beats.choiceRight(btn);
         dom.gate.dispatchEvent(new MouseEvent('click'));
         return;
       }
-      btn.classList.add('is-done');
+      wrongs++;
       busy = true;
       hearing(true);
-      var left = btns.filter(function (b) { return !b.classList.contains('is-done'); });
-      var last = left.length === 1 && left[0] === answer;
+      var shook = Flow.anim(Beats.choiceWrong(btn));
+      if (wrongs >= most) {
+        /* out of tries: once it has shaken, the answer is shown */
+        quiet(shook.then(function () {
+          if (!live) return;
+          live = false;
+          revealed = true;
+          dom.gate.dispatchEvent(new MouseEvent('click'));
+        }));
+        return;
+      }
       quiet(Promise.all([
-        Flow.anim(Beats.choiceWrong(btn)),
-        o.onWrong ? o.onWrong(btns.indexOf(btn)) : null
+        shook.then(function () { return live ? Flow.anim(reshuffle(btns)) : null; }),
+        o.onWrong ? o.onWrong(wrongs) : null
       ]).then(function () {
-        btn.classList.remove('is-wrong');
-        if (!live) return;          /* answered already: a skip, or the scene gone */
-        return Flow.anim(M.to(btn, { opacity: 0.55, duration: M.dur(0.3), ease: 'power2.inOut' }));
-      }).then(function () {
         busy = false;
         hearing(false);
-        if (!live || !last) return;
-        live = false;
-        auto = true;
-        dom.gate.dispatchEvent(new MouseEvent('click'));
       }));
     }
     function off() {
@@ -831,32 +869,26 @@
     return Flow.once(dom.gate, { auto: true }).then(
       function () {
         off();
-        return (auto ? Flow.wait(AUTO_AFTER) : Promise.resolve()).then(function () {
-          /* lit for the learner (put in, or answered by a skip) */
-          if (!answer.classList.contains('is-right')) {
-            answer.classList.add('is-right');
-            if (auto) quiet(Flow.anim(M.correct(answer)));
-          }
-          quiet(Flow.anim(M.focus(answer, btns, { opacity: 0.4 })));
-          return { tries: tries, auto: auto };
-        });
+        var answer = answerBtn();
+        btns.forEach(function (b) { if (b !== answer) b.classList.remove('is-wrong'); });
+        M.set(btns.map(choiceText), { opacity: 1 });
+        /* lit for the learner (revealed, or answered by a skip) */
+        if (!answer.classList.contains('is-right')) {
+          answer.classList.add('is-right');
+          if (revealed) quiet(Flow.anim(M.correct(answer)));
+        }
+        quiet(Flow.anim(M.focus(answer, btns, { opacity: 0.4 })));
+        return { tries: tries, revealed: revealed };
       },
       function (err) { off(); throw err; });
   }
-  /* The right answer's line, in the bubble, green. An answer put in for the
-     learner is named first ("This is the correct answer.") and the line's
-     own "Correct!" is left off -- the learner did not find it. */
-  function perchRight(key, res) {
-    if (!res || !res.auto) return perchLine(key, 'happy', 'yes');
-    var text = keyed(key).text, praise = T('fbCorrect');
-    if (text.indexOf(praise) === 0) text = text.slice(praise.length).trim();
-    return perchLine('fbAutoRight', 'happy', 'yes').then(function () {
-      if (!text) return null;
-      var mine = speaking;
-      return Flow.wait(SENTENCE_HOLD).then(function () {
-        if (mine === speaking) return perchLine({ text: text, vo: null }, 'happy', 'yes');
-      });
-    });
+  /* A verdict heard and not written: the bubble keeps the question while
+     the bird says the line. Resolves when it is over (or, for a line not yet
+     recorded, when the time it would take is up). */
+  function perchHear(key, mood) {
+    var mine = ++speaking;
+    mascot.state(mood || 'talking');
+    return voiceOver(key).then(function () { if (mine === speaking) mascot.settle(); });
   }
   /* The perch taken down: the bubble shuts, the bird jumps away behind the
      board, the row under it goes. */
@@ -1174,8 +1206,8 @@
      The card follows the finger sideways only, tilting as it goes. Past
      SWIPE_AT (figure units) the panel on that side leans in to say "here";
      let go there -- or flick it that way -- and the card is sorted. Let go
-     short of it and it springs home. Right: it flies into its panel and is
-     kept there, small, and the promise resolves { right }. Wrong: the panel
+     short of it and it springs home. Right: o.onRight is told, it flies into
+     its panel and is kept there, small, and the promise resolves { right }. Wrong: the panel
      shakes, the card springs home with a head-shake, o.onWrong is told and
      the learner tries again. A tap on the card wiggles it (the hint that it
      moves sideways); a tap on a panel sorts it there; the arrow keys on the
@@ -1210,6 +1242,7 @@
       var seat = z.seat(z.kept.length);
       z.kept.push(card);
       Beats.zoneRight(z);
+      if (o.onRight) o.onRight(z);
       Flow.anim(Beats.swipeInto(card, seat.x - card.centre.x, seat.y - card.centre.y, seat.k))
         .then(function () { dom.gate.dispatchEvent(new MouseEvent('click')); }, function () {});
     }
@@ -1646,8 +1679,8 @@
     celebrate: celebrate, praise: praise, burstAt: burstAt,
     askChoice: askChoice, askUntilRight: askUntilRight,
     perchSay: perchLine, perchVoice: perchVoice, perchChoices: perchChoices,
-    perchClear: perchClear, perchSum: perchSum, perchDown: perchDown,
-    perchUp: perchUp, perchRow: perchRow, perchAsk: perchAsk, perchRight: perchRight,
+    perchClear: perchClear, perchSum: perchSum, perchSteps: perchSteps, perchDown: perchDown,
+    perchUp: perchUp, perchRow: perchRow, perchAsk: perchAsk, perchHear: perchHear,
     armQuiz: armQuiz, armSwipe: armSwipe, armTapSides: armTapSides,
     dragGuide: function (to) { return W.dragGuide(dom.tray, to); },
     ripple: ripple, quiet: quiet, clearInline: clearInline

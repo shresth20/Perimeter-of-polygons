@@ -93,17 +93,20 @@
   opacity: 0;
 }
 .confetti__bit--round { width: 8px; height: 8px; border-radius: 50%; }
-.confetti__bit--blue { background: var(--ice-deep); }
-.confetti__bit--mint { background: var(--mint); }
-.confetti__bit--lavender { background: var(--lavender); }
-.confetti__bit--berry { background: var(--berry); }
-.confetti__bit--gold { background: var(--gold); }
+/* the figure palette (style.css): no green or red, which mean right and wrong */
+.confetti__bit--periwinkle { background: var(--fig-periwinkle); }
+.confetti__bit--orange { background: var(--fig-orange); }
+.confetti__bit--pink { background: var(--fig-pink); }
+.confetti__bit--lavender { background: var(--fig-lavender); }
+.confetti__bit--sky { background: var(--fig-sky); }
+.confetti__bit--yellow { background: var(--fig-yellow); }
 .confetti__bit--snow { background: var(--snow); }
-.qz-bit--blue { fill: var(--ice-deep); }
-.qz-bit--mint { fill: var(--mint); }
-.qz-bit--lavender { fill: var(--lavender); }
-.qz-bit--berry { fill: var(--berry); }
-.qz-bit--gold { fill: var(--gold); }
+.qz-bit--periwinkle { fill: var(--fig-periwinkle); }
+.qz-bit--orange { fill: var(--fig-orange); }
+.qz-bit--pink { fill: var(--fig-pink); }
+.qz-bit--lavender { fill: var(--fig-lavender); }
+.qz-bit--sky { fill: var(--fig-sky); }
+.qz-bit--yellow { fill: var(--fig-yellow); }
 
 @media (prefers-reduced-motion: reduce) {
   .wd.in { animation-duration: .01s; }

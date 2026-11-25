@@ -8,7 +8,7 @@
 @media (orientation: landscape) and (max-height: 520px) {
   :root { --board-w: min(1500px, 96vw, 167vh); }
   .board {
-    padding: clamp(8px, 3vh, 20px) clamp(12px, 3.5%, 28px);
+    padding: clamp(8px, calc(var(--board-w) * .01875), 20px) clamp(12px, 3.5%, 28px);
     border-width: 2px;
   }
 }

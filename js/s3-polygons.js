@@ -2,10 +2,17 @@
  * s3-polygons.js -- other polygons: their names, and regular or irregular
  * --------------------------------------------------------------------------
  * Two scenes. "Name the polygons": four regular polygons in a row, a box
- * under each, four names to drag. "Regular or irregular": six polygons, one
+ * under each, four names to drag; as the bird says what a regular polygon
+ * is, every side is marked equal. "Regular or irregular": six polygons, one
  * at a time, each on an ice card swiped left (Regular) or right
- * (Irregular), the panels keeping every card sorted into them; then the two
- * kinds side by side.
+ * (Irregular), the panels keeping every card sorted into them, and the next
+ * card in by itself; then the two kinds side by side. A card's equal sides
+ * are marked only as a hint, after a wrong sort, and the marks go once it is
+ * sorted. The four polygons to name each wear one colour of the figure
+ * palette -- the line in it at full strength, the inside a light shade of
+ * it. The polygons to sort are drawn alike, in dark blue, so no colour gives
+ * the answer away; the summary after them shows a regular polygon in one
+ * colour and an irregular one in many.
  * ========================================================================== */
 (function (global) {
   'use strict';
@@ -30,14 +37,21 @@
   var IRR_HEPT = [[0, -88], [55, -62], [88, 0], [60, 55], [10, 85], [-60, 65], [-80, -20]];
   var IRR_PENT = [[-10, -90], [80, -30], [55, 70], [-40, 85], [-85, 0]];
   var SC = { x: 500, y: 196 };
+  /* a right sort is answered "Correct!" alone; a wrong one is told why */
   var ITEMS = [
-    { pts: S.regular(5, SC.x, SC.y, 86), answer: 'zoneRegular',   wrong: 'o3Wrong1', right: 'o3Right1' },
-    { pts: at(SC.x, SC.y, IRR_HEX),      answer: 'zoneIrregular', wrong: 'o3Wrong2', right: 'o3Right2' },
-    { pts: S.regular(8, SC.x, SC.y, 86), answer: 'zoneRegular',   wrong: 'o3Wrong3', right: 'o3Right3' },
-    { pts: at(SC.x, SC.y, IRR_HEPT),     answer: 'zoneIrregular', wrong: 'o3Wrong4', right: 'o3Right4' },
-    { pts: at(SC.x, SC.y, IRR_PENT),     answer: 'zoneIrregular', wrong: 'o3Wrong5', right: 'o3Right5' },
-    { pts: S.regular(7, SC.x, SC.y, 86), answer: 'zoneRegular',   wrong: 'o3Wrong6', right: 'o3Right6' }
+    { pts: S.regular(5, SC.x, SC.y, 86), answer: 'zoneRegular',   wrong: 'o3Wrong1' },
+    { pts: at(SC.x, SC.y, IRR_HEX),      answer: 'zoneIrregular', wrong: 'o3Wrong2' },
+    { pts: S.regular(8, SC.x, SC.y, 86), answer: 'zoneRegular',   wrong: 'o3Wrong3' },
+    { pts: at(SC.x, SC.y, IRR_HEPT),     answer: 'zoneIrregular', wrong: 'o3Wrong4' },
+    { pts: at(SC.x, SC.y, IRR_PENT),     answer: 'zoneIrregular', wrong: 'o3Wrong5' },
+    { pts: S.regular(7, SC.x, SC.y, 86), answer: 'zoneRegular',   wrong: 'o3Wrong6' }
   ];
+  /* the polygons to sort: one dark blue line; their equal-side marks are
+     built, hidden, for the hint after a wrong sort */
+  function lookAlike() { return { cls: 'shape--black', ticks: true }; }
+  /* a polygon in one ink: its line in the ink, its inside a light shade of
+     it, its equal sides marked */
+  function oneInk(k) { return { inks: [k], tint: k, ticks: true }; }
   /* the two sides, and how many cards each will end up holding: the same
      big, flat panels as the warm-up's (no slab under them), close to the
      figure's edges -- see s1-warmup.js */
@@ -74,7 +88,7 @@
         gNames.removeAttribute('hidden');
         return FIGS.reduce(function (chain, f, i) {
           return chain.then(function () {
-            var s = S.build(gNames, S.regular(f.n, f.cx, FIG_Y, FIG_R), { inks: true });
+            var s = S.build(gNames, S.regular(f.n, f.cx, FIG_Y, FIG_R), oneInk(i));
             shapes.push(s);
             return Flow.anim(Beats.drawShape(s, { time: 0.7 }));
           });
@@ -118,8 +132,11 @@
       /* the sides of these polygons */
       .then(function () { return K.say('o2Look'); })
       .then(function () { return Flow.wait(BEAT); })
+      /* as "all sides" is said, every side of every polygon is marked equal */
       .then(function () {
         var all = shapes.reduce(function (a, s) { return a.concat(s.sides); }, []);
+        var ticks = shapes.reduce(function (a, s) { return a.concat(s.ticks); }, []);
+        K.onPhrase('o2Regular', 'all sides', function () { return Flow.anim(Beats.ticksIn(ticks, 0.03)); });
         return K.speakBySentence('o2Regular', null).then(function () { return all; });
       })
       .then(function (all) {
@@ -131,54 +148,76 @@
   /* ---- Scene 2: regular or irregular -------------------------------------- */
   function playItem(it, i) {
     var card = K.buildCard(gSort, SC.x, SC.y);
-    var shape = S.build(card.g, it.pts, { inks: true });
-    var last = i === ITEMS.length - 1, answered = false, stopHand = null;
+    var shape = S.build(card.g, it.pts, lookAlike());
+    var last = i === ITEMS.length - 1, answered = false, stopHand = null, hinted = false;
+    /* a wrong sort: the equal sides are marked, once, as the hint (an
+       irregular polygon has none to mark -- its line says why instead) */
+    function hint() {
+      if (hinted || answered) return;
+      hinted = true;
+      K.quiet(Flow.anim(Beats.ticksIn(shape.ticks, 0.05)));
+    }
+    function unmark() { if (hinted) K.quiet(Flow.anim(Beats.ticksOut(shape.ticks))); }
     return Flow.anim(Beats.swipeIn(card))
       .then(function () { return Flow.anim(Beats.drawShape(shape, { time: 0.9 })); })
       .then(function () { return Flow.wait(SHORT); })
       .then(function () { return i === 0 ? K.say('o3Ask') : null; })
       .then(function () {
-        var target = zones.filter(function (z) { return z.name === it.answer; })[0];
+        /* the hint sways the card both ways: it never points at the answer */
+        var left = zones.filter(function (z) { return z.side === 'left'; })[0];
+        var right = zones.filter(function (z) { return z.side === 'right'; })[0];
         K.quiet(Flow.wait(NUDGE_AFTER).then(function () {
           if (answered) return;
-          stopHand = W.handDrag(function () { return centreOf(card.face); }, function () { return centreOf(target.body); }, 60);
+          stopHand = W.handSway(function () { return centreOf(card.face); },
+                                function () { return centreOf(left.body); },
+                                function () { return centreOf(right.body); }, 60);
         }));
         return K.armSwipe(card, zones, it.answer, {
           onTouch: function () { if (stopHand) { stopHand(); stopHand = null; } },
-          onWrong: function () { K.quiet(K.speakBySentence(it.wrong, 'confused')); }
+          onWrong: function () { hint(); K.quiet(K.speakBySentence(it.wrong, 'confused')); },
+          /* sorted: any marks go as it flies into its panel */
+          onRight: unmark
         });
       })
       .then(function () {
         answered = true;
         if (stopHand) { stopHand(); stopHand = null; }
+        unmark();
         return Flow.wait(Beats.ringing());
       })
-      .then(function () { return K.speakBySentence(it.right, 'happy'); })
+      .then(function () { return K.speakBySentence('fbCorrect', 'happy'); })
       .then(function () {
         if (!last) return null;
         K.celebrate();
         return Flow.wait(Beats.ringing()).then(function () { return K.say('o3Done', 'happy'); });
       })
       .then(function () { return Flow.wait(SHORT); })
-      .then(function () { return K.handOver(); });
+      /* no Next between polygons: the page turns itself and the next card
+         comes in; Next waits for the last one */
+      .then(function () { return last ? K.handOver() : K.autoTurn(BEAT); });
   }
 
-  function miniShape(pts, w, hh) {
+  function miniShape(pts, w, hh, opts) {
     var svg = S.el('svg', { viewBox: '0 0 ' + w + ' ' + hh });
-    S.build(svg, pts, { inks: true });
+    S.build(svg, pts, opts);
     return svg;
   }
+  /* The two kinds side by side, each named over its polygon: the regular
+     one in one colour (every side the same length), the irregular one a
+     colour to each side (no two the same). */
+  var IRR_INKS = [0, 1, 2, 3, 4, 5];
   function summary() {
-    var grid = h('div', 'grid grid--2 grid--kinds', dom.layer);
+    var grid = h('div', 'grid grid--2 grid--kinds grid--named', dom.layer);
     layerNodes.push(grid);
     var cards = [
-      { svg: miniShape(S.regular(6, 125, 85, 70), 250, 170), title: 'o4RegTitle', lines: ['o4RegA', 'o4RegB'] },
-      { svg: miniShape(at(125, 88, IRR_HEX.map(function (p) { return [p[0] * 0.85, p[1] * 0.85]; })), 250, 170), title: 'o4IrrTitle', lines: ['o4IrrA'] }
+      { svg: miniShape(S.regular(6, 125, 85, 70), 250, 170, oneInk(0)), title: 'o4RegTitle', lines: ['o4RegA', 'o4RegB'] },
+      { svg: miniShape(at(125, 88, IRR_HEX.map(function (p) { return [p[0] * 0.85, p[1] * 0.85]; })), 250, 170,
+          { inks: IRR_INKS, tint: 3 }), title: 'o4IrrTitle', lines: ['o4IrrA'] }
     ].map(function (c) {
       var card = h('div', 'card', grid);
+      var t = h('p', 'card__title', card); t.textContent = T(c.title);
       card.appendChild(c.svg);
       var text = h('div', 'card__text', card);
-      var t = h('p', 'card__title', text); t.textContent = T(c.title);
       c.lines.forEach(function (k) { var r = h('div', 'card__row is-note', text); r.textContent = T(k); });
       return card;
     });

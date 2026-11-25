@@ -13,6 +13,9 @@
   opacity: 0;
 }
 .shape__fill.is-deep { fill: var(--shape-fill-deep); }
+/* A shape in one colour of the palette (shapes.js `tint`): the line in the
+   colour at full strength, the inside a light shade of the same colour. */
+.shape--tint .shape__fill { fill: color-mix(in srgb, var(--tint) 24%, var(--snow)); }
 .shape__outline {
   fill: none;
   stroke: var(--shape-line);
@@ -33,6 +36,22 @@
 /* A side lit while it is named: its own ink, crisp (no blurred bloom). */
 .shape__side.is-lit {
   filter: none;
+}
+/* A side the learner has tapped (s4-regular.js) changes colour: the
+   perimeter's yellow, eased in by the stroke transition above. */
+.shape__side.is-tapped { stroke: var(--perim-glow); }
+/* The polygons drawn alike, in one black line (section 4: names, regular or
+   irregular), so no colour gives an answer away. */
+.shape--black { --shape-line: var(--shape-black); }
+/* Equal sides marked (shapes.js ticks): short black strokes across them,
+   hidden until a beat shows them. */
+.shape__tick {
+  fill: none;
+  stroke: var(--shape-black);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  opacity: 0;
+  pointer-events: none;
 }
 .shape__side.is-dim { opacity: .28; }
 .shape__hit {
@@ -78,16 +97,20 @@
 }
 /* A shape drawn large on its own: its lengths written to match. */
 .shape--big .shape__label { font-size: 31px; }
+/* Section 6: the letter "a" on a big regular polygon (pages 1-3), and on
+   the three polygons of page 5 -- a step up, a single letter reads small. */
+.shape--big.shape--letters .shape__label { font-size: 38px; }
+.shape--trio .shape__label { font-size: 30px; }
 .shape__name {
   fill: var(--ink);
   font-size: 24px;
   opacity: 0;
 }
 
-/* The two kinds of highlight the warm-up asks about: the boundary, as a
-   thick golden stroke, and the inside, as a deep wash -- one layer, the
-   only fill the shape has, darker than the light outline round it, so the
-   eye goes to the inside and not the edge. */
+/* The two kinds of highlight the warm-up asks about, one colour pair on
+   every shape: the boundary, as a thick yellow stroke, and the inside, as a
+   light blue wash -- one layer, the only fill the shape has, with a plain
+   edge round it, so the eye goes to the inside and not the edge. */
 .shape__perim {
   fill: none;
   stroke: var(--perim-glow);
@@ -101,6 +124,8 @@
   opacity: 0;
 }
 .shape--area .shape__side { stroke: var(--area-rim); }
+/* a lit boundary's card wears the same light blue inside as a lit inside's */
+.shape--area .shape__fill { fill: var(--area-wash); }
 
 /* The light that walks the boundary: a crisp golden band (no blur), a white core and the
    trail it leaves (see Beats.walk). One dash per layer, placed by the beat. */
@@ -251,8 +276,8 @@
    ========================================================================== */
 .card {
   position: absolute;
-  padding: clamp(8px, 1.6vh, 16px) clamp(12px, 2vw, 24px);
-  border-radius: clamp(12px, 2vh, 20px);
+  padding: clamp(8px, calc(var(--board-w) * .01), 16px) clamp(12px, calc(var(--board-w) * .02), 24px);
+  border-radius: clamp(12px, calc(var(--board-w) * .0125), 20px);
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--snow) 92%, transparent) 0%,
     color-mix(in srgb, var(--ice-1) 90%, transparent) 100%);
@@ -266,7 +291,7 @@
 .card__title {
   margin: 0 0 .25em;
   font-family: var(--font-display);
-  font-size: clamp(15px, 2.9vh, 28px);
+  font-size: clamp(15px, calc(var(--board-w) * .018), 28px);
   letter-spacing: .4px;
   color: var(--ice-ink);
 }
@@ -274,7 +299,7 @@
   margin: 0 0 .3em;
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: clamp(13px, 2.3vh, 22px);
+  font-size: clamp(13px, calc(var(--board-w) * .0144), 22px);
   color: var(--ink-soft);
 }
 .card__row {
@@ -283,22 +308,34 @@
   gap: .35em;
   margin: .15em 0;
   font-family: var(--font-display);
-  font-size: clamp(17px, 3.4vh, 34px);
+  font-size: clamp(17px, calc(var(--board-w) * .02125), 34px);
   letter-spacing: .5px;
   line-height: 1.15;
   white-space: nowrap;
 }
 .card__row.is-result { color: var(--right-border); }
-.card__row.is-soft { color: var(--ink-soft); font-size: clamp(14px, 2.6vh, 26px); }
-.card__row.is-note { font-family: var(--font-body); font-weight: 700; font-size: clamp(13px, 2.3vh, 22px); color: var(--ink-soft); white-space: normal; }
+.card__row.is-soft { color: var(--ink-soft); font-size: clamp(14px, calc(var(--board-w) * .01625), 26px); }
+.card__row.is-note { font-family: var(--font-body); font-weight: 700; font-size: clamp(13px, calc(var(--board-w) * .0144), 22px); color: var(--ink-soft); white-space: normal; }
 .term { color: var(--c, var(--ink)); }
 .term.is-op { color: var(--ink-soft); }
 .term.is-total { color: var(--right-border); margin-left: .1em; }
+/* A side's length on its way from the shape into the sum (Beats.termFly):
+   a twin of the term, over everything, placed by its transform alone. */
+.term-fly {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9;
+  margin: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
 
 /* The working under the bird, where the answers stood (pages.js perchSum):
    "Perimeter:" over the sum, on one line with its total -- large type set
-   straight on the ice, no card behind it. A white halo round the letters
-   keeps them clear of the board, as the shape's own labels are. */
+   straight on the ice, no card behind it, and flat letters with no white
+   halo, as the shape's own labels are. */
 .perch .card--perch {
   position: relative;
   padding: 0;
@@ -306,10 +343,6 @@
   border-radius: 0;
   background: none;
   box-shadow: none;
-  text-shadow:
-    0 0 2px var(--snow),
-    0 0 4px var(--snow),
-    0 0 10px color-mix(in srgb, var(--snow) 80%, transparent);
 }
 .perch .card--perch .card__title {
   margin-bottom: .05em;
@@ -322,15 +355,42 @@
 .perch .card--perch.card--long .card__row {
   font-size: clamp(18px, calc(var(--board-w) * .028), 42px);
 }
-/* The working beside a regular polygon (s4-regular.js, pages 1-3): no
-   heading, the sum and the two lines under it -- "= 3a", "= 3 × side" --
-   a step smaller so all three stand under the bird. */
+/* The working beside a regular polygon (s4-regular.js, pages 1-3; widgets.js
+   stepsCard): "a + a + a = 3a" on one line, "= 3 × side" under it, the two
+   "=" one above the other. Two columns -- the terms, then everything from
+   "=" -- so both lines' "=" stand at the second column's left edge. A step
+   smaller than the plain sum, so the pentagon's line stands under the bird. */
 .perch .card--perch.card--steps .card__row {
-  font-size: clamp(18px, calc(var(--board-w) * .032), 48px);
+  font-size: clamp(16px, calc(var(--board-w) * .029), 44px);
 }
-.perch .card--perch.card--steps .card__row.is-soft {
-  font-size: clamp(15px, calc(var(--board-w) * .025), 38px);
+.steps {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: start;
+  column-gap: .5em;
 }
+.steps__lhs { grid-column: 1; grid-row: 1; }
+.steps__lhs > .card__row--terms:not(.card__ghost) { min-height: 1.15em; }
+.steps__eq { grid-column: 2; grid-row: 1; }
+.steps__rule { grid-column: 2; grid-row: 2; }
+.steps__rhs { display: block; color: var(--right-border); white-space: nowrap; }
+/* the result's end ("a", " × side"): every end stacked in one place, so the
+   line is as wide as its longest from the start; each one transformable */
+.steps__head { display: inline-block; white-space: pre; }
+.steps__tail { display: inline-grid; justify-items: start; }
+.steps__end { grid-area: 1 / 1; display: inline-block; white-space: pre; }
+.steps-fly { display: block; }
+/* The shape's facts under the bird (s5-irregular.js infoCard): the same
+   look as the summary cards in sections 3 and 6 -- border and shadow kept,
+   no fill, larger left-aligned type. */
+.perch .card--info {
+  background: none;
+  padding: clamp(10px, calc(var(--board-w) * .0125), 22px) clamp(16px, calc(var(--board-w) * .025), 32px);
+  text-align: left;
+}
+.perch .card--info .card__title { font-size: clamp(20px, calc(var(--board-w) * .025), 40px); }
+.perch .card--info .card__row.is-soft { justify-content: flex-start; font-size: clamp(17px, calc(var(--board-w) * .02), 32px); }
 /* the finished sum, laid out unseen: it gives the card its width only */
 .card__ghost {
   visibility: hidden;
@@ -350,14 +410,15 @@
   position: absolute;
   inset: 2% 3% 15%;
   display: grid;
-  gap: clamp(8px, 1.6vw, 20px);
+  gap: clamp(8px, calc(var(--board-w) * .0167), 20px);
   align-items: stretch;
 }
 .grid--3 { grid-template-columns: repeat(3, 1fr); }
 .grid--2 { grid-template-columns: repeat(2, 1fr); }
 .grid .card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
 .grid .card svg { width: 100%; height: auto; max-height: 56%; overflow: visible; }
-.grid .card svg .shape__fill, .grid .card svg .shape__side, .grid .card svg .shape__label, .grid .card svg .shape__outline { opacity: 1; }
+.grid .card svg .shape__fill, .grid .card svg .shape__side, .grid .card svg .shape__label, .grid .card svg .shape__outline,
+.grid .card svg .shape__tick { opacity: 1; }
 .grid .card .card__row { justify-content: center; }
 .grid .card .card__title { margin-top: .2em; }
 /* Regular vs irregular summary: no card fill, bigger shapes, text block left-aligned and centred in the card. */
@@ -365,11 +426,30 @@
 .grid--kinds .card svg { max-height: 66%; }
 .grid--kinds .card__text { text-align: left; }
 .grid--kinds .card .card__text .card__row { justify-content: flex-start; }
-.grid--kinds .card .card__title { font-size: clamp(20px, 4vh, 40px); }
-.grid--kinds .card .card__row.is-note { font-size: clamp(17px, 3.2vh, 32px); }
-.grid--kinds .card .card__sub { font-size: clamp(16px, 3vh, 30px); }
+.grid--kinds .card .card__title { font-size: clamp(20px, calc(var(--board-w) * .025), 40px); }
+.grid--kinds .card .card__row.is-note { font-size: clamp(17px, calc(var(--board-w) * .02), 32px); }
+.grid--kinds .card .card__sub { font-size: clamp(16px, calc(var(--board-w) * .01875), 30px); }
 /* Three-across summary (section 3): shapes a touch larger, spilling into the card padding. */
 .grid--3.grid--kinds .card svg { width: 115%; flex-shrink: 0; max-height: 70%; }
+/* Summary cards with the shape's name over it (section 3: the formulas,
+   s2-basics.js; section 5: regular and irregular, s3-polygons.js): name,
+   shape and what is said about it spread evenly down the card, not bunched
+   in its middle, the words centred under the shape. */
+.grid--named .card { justify-content: space-around; }
+.grid--named .card .card__title { margin: 0 0 .1em; }
+.grid--named .card__text { width: 100%; text-align: center; }
+.grid--named .card .card__text .card__row { justify-content: center; }
+/* The three formulas: the rule on ONE line under the shape --
+   "Perimeter: 2 × (l + b)" -- never wrapped. */
+.grid--formulas.grid--3 .card svg { max-height: 60%; }
+.grid--formulas .card .card__text .card__formula {
+  justify-content: center;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: .3em;
+  white-space: nowrap;
+}
+.grid--formulas .card__formula .card__sub { margin: 0; }
 .rule-line {
   position: absolute;
   left: 50%;
@@ -380,7 +460,7 @@
   border: 3px solid var(--gold);
   background: color-mix(in srgb, var(--snow) 92%, var(--gold));
   font-family: var(--font-display);
-  font-size: clamp(15px, 3vh, 30px);
+  font-size: clamp(15px, calc(var(--board-w) * .01875), 30px);
   color: var(--ink);
   white-space: nowrap;
   box-shadow: 0 6px 16px var(--shadow-soft);
@@ -392,28 +472,20 @@
   position: absolute;
   inset: 4% 6%;
   display: grid;
-  grid-template-rows: auto 1fr 1fr 1fr;
-  gap: clamp(6px, 1.2vh, 12px);
+  grid-template-rows: repeat(3, 1fr);
+  gap: clamp(6px, calc(var(--board-w) * .0075), 12px);
 }
 .ptable .card { position: relative; display: grid; grid-template-columns: 1.1fr 1.6fr 1fr 1.4fr; align-items: center; gap: 2%; padding-block: .3em; background: none; }
-.ptable .card svg { width: 100%; max-height: 100%; height: clamp(56px, 12vh, 120px); overflow: visible; }
+.ptable .card svg { width: 100%; max-height: 100%; height: clamp(52px, calc(var(--board-w) * .1), 160px); overflow: visible; }
 .ptable .card svg .shape__fill, .ptable .card svg .shape__side { opacity: 1; }
-.ptable .ptable__name { font-family: var(--font-body); font-weight: 700; font-size: clamp(18px, 3.8vh, 38px); }
-.ptable .ptable__sides { font-family: var(--font-display); font-size: clamp(20px, 4.4vh, 44px); color: var(--ice-ink); }
-.ptable .ptable__eq { font-family: var(--font-display); font-size: clamp(22px, 4.8vh, 48px); }
-.ptable__head {
-  margin: 0;
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: clamp(18px, 3.6vh, 36px);
-  color: var(--ice-ink);
-  opacity: 0;
-}
+.ptable .ptable__name { font-family: var(--font-body); font-weight: 700; font-size: clamp(14px, calc(var(--board-w) * .02375), 38px); }
+.ptable .ptable__sides { font-family: var(--font-display); font-size: clamp(15px, calc(var(--board-w) * .0275), 44px); color: var(--c, var(--ice-ink)); }
+.ptable .ptable__eq { font-family: var(--font-display); font-size: clamp(16px, calc(var(--board-w) * .03), 48px); }
 
 /* ---- The sliders --------------------------------------------------------- */
 .slider {
   margin: .3em 0 .5em;
-  font-size: clamp(13px, 2.4vh, 22px);
+  font-size: clamp(13px, calc(var(--board-w) * .015), 22px);
   opacity: 0;
 }
 .slider__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .35em; font-family: var(--font-display); letter-spacing: .4px; }

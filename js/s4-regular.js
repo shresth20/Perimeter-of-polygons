@@ -84,7 +84,12 @@
       })
       .then(function () { return K.perchSay('r1Walk'); })
       .then(function () {
-        K.quiet(Flow.wait(NUDGE_AFTER).then(function () { if (!touched) stopHand = W.handNudge(shape.hits[0], { x: 0.5, y: 0.5 }); }));
+        /* no side tapped yet: the hand shows where, as the bird says it */
+        K.quiet(Flow.wait(NUDGE_AFTER).then(function () {
+          if (touched || Flow.isFast()) return;
+          stopHand = W.handNudge(shape.hits[0], { x: 0.5, y: 0.5 });
+          K.quiet(K.perchSay('r1TapAsk'));
+        }));
         return K.armTapSides(shape, {
           onTap: function (i) {
             touched = true;
@@ -207,7 +212,8 @@
           onTouch: function () { touched = true; if (guide) guide(); },
           onWrong: function (box, chip) {
             var f = DRAG.filter(function (d) { return d.opt === box.name; })[0];
-            K.quiet(K.speakBySentence(f.wrong, 'confused', { m: parseInt(T(chip.dataset.name), 10) }));
+            var m = DRAG.filter(function (d) { return d.opt === chip.dataset.name; })[0];
+            K.quiet(K.speakBySentence(f.wrong + 'Not' + m.n, 'confused'));
           },
           onRight: function (box, chip, placed) {
             K.burstAt(box.centre.x, box.centre.y);
@@ -218,7 +224,6 @@
         }).then(function () { if (guide) guide(); });
       })
       .then(function () { return Flow.anim(Beats.trayOut(dom.tray, K.chips())); })
-      .then(function () { return K.speakBySentence('r5Done1'); })
       .then(function () {
         K.celebrate();
         return Flow.wait(Beats.ringing()).then(function () { return K.speakBySentence('r5Done2', 'happy'); });

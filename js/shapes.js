@@ -272,6 +272,25 @@
     return d.join(' ');
   }
 
+  /* ---- angles, marked ------------------------------------------------------
+     The geometry book's sign for an angle: a small arc inside each corner,
+     from one side to the other. Kept small (ANGLE_R, and never more than a
+     share of the shorter side at that corner) so it marks the corner
+     without crowding the figure. Drawn across the smaller opening between
+     the two sides -- the inside of a convex polygon, which is every polygon
+     that is marked. */
+  var ANGLE_R = 12, ANGLE_SHARE = 0.25;
+  function anglePath(prev, v, next) {
+    var ux = prev.x - v.x, uy = prev.y - v.y, wx = next.x - v.x, wy = next.y - v.y;
+    var lu = Math.sqrt(ux * ux + uy * uy) || 1, lw = Math.sqrt(wx * wx + wy * wy) || 1;
+    var r = Math.min(ANGLE_R, ANGLE_SHARE * Math.min(lu, lw));
+    ux /= lu; uy /= lu; wx /= lw; wy /= lw;
+    var sweep = ux * wy - uy * wx > 0 ? 1 : 0;
+    return 'M' + round2(v.x + ux * r) + ' ' + round2(v.y + uy * r) +
+           ' A' + round2(r) + ' ' + round2(r) + ' 0 0 ' + sweep + ' ' +
+           round2(v.x + wx * r) + ' ' + round2(v.y + wy * r);
+  }
+
   /* opts:
        inks     true: one ink per side LENGTH (--side-i; equal sides share
                 one, see above); a list of ink indices to use one per side;
@@ -288,6 +307,8 @@
        perim/area  the warm-up's two highlights
        ticks    true: equal sides marked with strokes across them (above);
                 hidden until a beat shows them (Beats.ticksIn)
+       angles   true: a small arc in every corner (above); hidden until a
+                beat shows them (Beats.ticksIn)
        tint     an ink index: the inside washed in a light shade of that
                 ink (--side-i), so a shape outlined in its colour is not
                 left a pale ice blue inside
@@ -308,7 +329,7 @@
       fill: el('path', { 'class': 'shape__fill' }),
       area: o.area ? el('path', { 'class': 'shape__area' }) : null,
       perim: o.perim ? el('path', { 'class': 'shape__perim' }) : null,
-      sides: [], hits: [], labels: [], vertices: [], vhits: [], ticks: [], inks: [], inkMap: null,
+      sides: [], hits: [], labels: [], vertices: [], vhits: [], ticks: [], angles: [], inks: [], inkMap: null,
       outline: el('path', { 'class': 'shape__outline' }),
       tip: el('circle', { 'class': 'shape__tip', r: 7 }),
       hitbox: o.hitbox ? el('path', { 'class': 'shape__hitbox' }) : null,
@@ -328,6 +349,13 @@
         var tk = el('path', { 'class': 'shape__tick' });
         g.appendChild(tk);
         s.ticks.push(tk);
+      }
+    }
+    if (o.angles) {
+      for (i = 0; i < n; i++) {
+        var an = el('path', { 'class': 'shape__angle' });
+        g.appendChild(an);
+        s.angles.push(an);
       }
     }
     if (o.hits) {
@@ -413,6 +441,7 @@
         s.sides[i].setAttribute('d', sd);
         if (s.hits[i]) s.hits[i].setAttribute('d', sd);
         if (marks) s.ticks[i].setAttribute('d', tickPath(p[i], p[(i + 1) % s.n], marks[i]));
+        if (s.angles[i]) s.angles[i].setAttribute('d', anglePath(p[(i + s.n - 1) % s.n], p[i], p[(i + 1) % s.n]));
         if (s.labels[i]) {
           var txt = String(s.labelText(i));
           s.labels[i].textContent = txt;

@@ -3,7 +3,8 @@
  * --------------------------------------------------------------------------
  * Two scenes. "Name the polygons": four regular polygons in a row, a box
  * under each, four names to drag; as the bird says what a regular polygon
- * is, every side is marked equal. "Regular or irregular": six polygons, one
+ * is, every side is marked equal and every corner gets a small angle mark.
+ * "Regular or irregular": six polygons, one
  * at a time, each on an ice card swiped left (Regular) or right
  * (Irregular), the panels keeping every card sorted into them, and the next
  * card in by itself; then the two kinds side by side. A card's equal sides
@@ -33,7 +34,9 @@
   var FIG_Y = 158, FIG_R = 76, BOX_Y = 282, BOX_W = 196;
 
   function at(cx, cy, pts) { return pts.map(function (p) { return { x: cx + p[0], y: cy + p[1] }; }); }
-  var IRR_HEX  = [[-20, -85], [60, -60], [85, 10], [30, 80], [-50, 70], [-80, -10]];
+  /* plainly uneven: one long side over the top, two short ones, the rest
+     in between -- the difference is seen at a glance */
+  var IRR_HEX  = [[-80, -78], [72, -86], [96, -36], [58, 84], [-22, 66], [-96, 8]];
   var IRR_HEPT = [[0, -88], [55, -62], [88, 0], [60, 55], [10, 85], [-60, 65], [-80, -20]];
   var IRR_PENT = [[-10, -90], [80, -30], [55, 70], [-40, 85], [-85, 0]];
   var SC = { x: 500, y: 196 };
@@ -52,6 +55,8 @@
   /* a polygon in one ink: its line in the ink, its inside a light shade of
      it, its equal sides marked */
   function oneInk(k) { return { inks: [k], tint: k, ticks: true }; }
+  /* ...and its corners marked equal too: the four polygons to name */
+  function oneInkAngles(k) { var o = oneInk(k); o.angles = true; return o; }
   /* the two sides, and how many cards each will end up holding: the same
      big, flat panels as the warm-up's (no slab under them), close to the
      figure's edges -- see s1-warmup.js */
@@ -88,7 +93,7 @@
         gNames.removeAttribute('hidden');
         return FIGS.reduce(function (chain, f, i) {
           return chain.then(function () {
-            var s = S.build(gNames, S.regular(f.n, f.cx, FIG_Y, FIG_R), oneInk(i));
+            var s = S.build(gNames, S.regular(f.n, f.cx, FIG_Y, FIG_R), oneInkAngles(i));
             shapes.push(s);
             return Flow.anim(Beats.drawShape(s, { time: 0.7 }));
           });
@@ -114,7 +119,7 @@
           group: gNames,
           onTouch: function () { touched = true; if (guide) guide(); },
           onWrong: function (box, chip) {
-            K.quiet(K.speakBySentence('o1Wrong' + SIDES[box.name], 'confused', { m: SIDES[chip.dataset.name] }));
+            K.quiet(K.speakBySentence('o1Wrong' + SIDES[box.name] + 'Not' + SIDES[chip.dataset.name], 'confused'));
           },
           onRight: function (box, chip, placed) {
             K.burstAt(box.centre.x, box.centre.y);
@@ -132,11 +137,14 @@
       /* the sides of these polygons */
       .then(function () { return K.say('o2Look'); })
       .then(function () { return Flow.wait(BEAT); })
-      /* as "all sides" is said, every side of every polygon is marked equal */
+      /* as "all sides" is said, every side of every polygon is marked equal;
+         as "all angles" is said, every corner gets its small angle mark */
       .then(function () {
         var all = shapes.reduce(function (a, s) { return a.concat(s.sides); }, []);
         var ticks = shapes.reduce(function (a, s) { return a.concat(s.ticks); }, []);
+        var angles = shapes.reduce(function (a, s) { return a.concat(s.angles); }, []);
         K.onPhrase('o2Regular', 'all sides', function () { return Flow.anim(Beats.ticksIn(ticks, 0.03)); });
+        K.onPhrase('o2Regular', 'all angles', function () { return Flow.anim(Beats.ticksIn(angles, 0.03)); });
         return K.speakBySentence('o2Regular', null).then(function () { return all; });
       })
       .then(function (all) {
@@ -150,6 +158,10 @@
     var card = K.buildCard(gSort, SC.x, SC.y);
     var shape = S.build(card.g, it.pts, lookAlike());
     var last = i === ITEMS.length - 1, answered = false, stopHand = null, hinted = false;
+    /* every polygon after the first: the question is back in the header as
+       the card comes in (written, not said again), so the last card's
+       "Correct!" is not left standing over the new one */
+    if (i > 0) K.quiet(K.speak(T('o3Ask')));
     /* a wrong sort: the equal sides are marked, once, as the hint (an
        irregular polygon has none to mark -- its line says why instead) */
     function hint() {
@@ -227,6 +239,13 @@
       .then(function () { return Flow.anim(Beats.cardsIn(cards, 0.22)); })
       .then(function () { return Flow.wait(LOOK); })
       .then(function () { return K.speakBySentence('o4Great', 'happy'); })
+      .then(function () { return Flow.wait(BEAT); })
+      /* as "sides or angles" is said, the irregular polygon's sides breathe */
+      .then(function () {
+        var sides = Array.prototype.slice.call(cards[1].querySelectorAll('.shape__side'));
+        K.onPhrase('o4IrrDef', 'sides or angles', function () { return Flow.anim(Beats.partPulse(sides, 2)); });
+        return K.say('o4IrrDef');
+      })
       .then(function () { return Flow.wait(BEAT); })
       .then(function () { return K.say('o4Next'); })
       .then(function () { return Flow.wait(SHORT); })

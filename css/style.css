@@ -87,8 +87,10 @@
                                           the strokes marking equal sides: the
                                           game's own dark blue, not black */
   /* The warm-up's one colour pair, the same on every shape: the perimeter
-     is a yellow boundary, the area a light blue inside. */
-  --area-wash:       var(--ice-3);     /* the lit inside: a light blue          */
+     is a yellow boundary, the area a dark blue inside, blinking over the
+     card's light blue. */
+  --area-wash:       var(--ice-3);     /* every card's inside: a light blue     */
+  --area-lit:        var(--ice-ink);   /* the lit inside: a dark blue           */
   --area-rim:        color-mix(in srgb, var(--ice-deep) 45%, var(--ice-3)); /* its edge, plain */
   --perim-glow:      var(--gold);
 

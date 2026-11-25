@@ -34,6 +34,14 @@
   var SPREAD_INSET = 0.05;      /* of the shown height, kept clear top and bottom */
   var cy = CY;                  /* the heptagon's centre as laid out */
   var SUM = [4, 5, 3, 6, 4, 3, 5];
+  /* the question's answers (the right one second) and each wrong one's
+     line, with the words at which the heptagon's sides breathe; the light
+     walks the sides as the right (or shown) answer's line gets to its
+     adding */
+  var OPTS = [28, 30, 26], RIGHT = 1;
+  var WRONG = { 28: { key: 'i2Wrong28', at: 'every side' }, 26: { key: 'i2Wrong26', at: 'all 7 sides' } };
+  var NOT_QUITE = { key: 'bNotQuite', at: 'all the sides' };
+  var TOLD_AT = '4 + 5', REVEAL_AT = 'Add all';
   /* the irregular heptagon with exactly those sides, in cm about its centre */
   var IRR_CM = [[0.142, -4.981], [3.782, -3.322], [4.645, 1.603], [3.055, 4.146], [-2.944, 4.273], [-4.577, 0.622], [-4.104, -2.341]];
   function irregular() {
@@ -43,6 +51,23 @@
   var dom = null, group = null, layerNodes = [];
   function build(kit) { dom = kit.dom(); group = document.getElementById('figIrregular'); }
   function cm(n) { return T('lblCm', { n: n }); }
+  /* The light's time round the heptagon for a right answer: over the adding
+     its recording says ("4 + 5 + ... ="), so each length joins the sum as it
+     is heard -- `said` is when the line began. Its own pace when the line
+     has no word timings, and never slower than that pace. */
+  function walkSecs(key, said, pace) {
+    var I = global.I18n;
+    if (!said || !I || !I.cues || !I.cues(key)) return pace;
+    var left = (K.voiceAt(key, '=') - (performance.now() - said)) / 1000;
+    return Math.max(pace * 0.5, Math.min(pace, left));
+  }
+  /* The line for the wrong answer tapped (a pill's label, "28 cm"). */
+  function wrongFor(label) {
+    for (var k = 0; k < OPTS.length; k++) {
+      if (cm(OPTS[k]) === label && WRONG[OPTS[k]]) return WRONG[OPTS[k]];
+    }
+    return NOT_QUITE;
+  }
   function centreOf(el) { var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
   /* The heptagon's name over it and its facts in one line under it, written
      on the figure in the shape's own group. */
@@ -107,8 +132,12 @@
   }
 
   /* Any corner dragged: the shape is re-laid out under the finger, its
-     lengths rewritten live. Resolves once a corner has been moved and let
-     go (at once under Skip). */
+     lengths rewritten live -- and not only the two sides at that corner:
+     every other corner moves WITH the drag, eased from the regular heptagon
+     towards the irregular one the question is about, all the way there once
+     the finger has gone FOLLOW_D figure units. Resolves once a corner has
+     been moved and let go (at once under Skip). */
+  var FOLLOW_D = 90;
   function armVertex(shape) {
     var drag = null, live = true;
     shape.g.classList.add('is-live');
@@ -117,7 +146,8 @@
       if (!live || drag) return;
       var i = shape.vhits.indexOf(ev.currentTarget);
       ev.preventDefault();
-      drag = { i: i, id: ev.pointerId, ox: ev.clientX, oy: ev.clientY, x0: shape.pts[i].x, y0: shape.pts[i].y, moved: false };
+      drag = { i: i, id: ev.pointerId, ox: ev.clientX, oy: ev.clientY, x0: shape.pts[i].x, y0: shape.pts[i].y, moved: false,
+               base: shape.pts.slice(), goal: irregular() };
       try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
       shape.vertices[i].classList.add('is-held');
     }
@@ -125,7 +155,14 @@
       if (!drag || ev.pointerId !== drag.id) return;
       var dx = (ev.clientX - drag.ox) / k(), dy = (ev.clientY - drag.oy) / k();
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-      var pts = shape.pts.slice();
+      /* how far the drag has gone, 0..1, eased: the other corners' share
+         of the way to the irregular heptagon */
+      var t = Math.min(1, Math.sqrt(dx * dx + dy * dy) / FOLLOW_D);
+      t = t * t * (3 - 2 * t);
+      var pts = drag.base.map(function (p, j) {
+        var q = drag.goal[j];
+        return { x: S.round2(p.x + (q.x - p.x) * t), y: S.round2(p.y + (q.y - p.y) * t) };
+      });
       pts[drag.i] = { x: Math.max(DRAG_X[0], Math.min(DRAG_X[1], drag.x0 + dx)), y: Math.max(DRAG_Y[0], Math.min(DRAG_Y[1], drag.y0 + dy)) };
       shape.set(pts);
     }
@@ -163,6 +200,7 @@
   function sceneIrregular() {
     var g = S.el('g');
     var shape = null, title = null, facts = null, sum = null;
+    var answered = false;
     return K.interlude(['i0Intro'])
       /* the header stays shut: the bird speaks from beside the shape */
       .then(function () { return Flow.anim(K.collapseHeader(true)); })
@@ -215,21 +253,37 @@
 
       /* ---- the question, asked from the same spot ---------------------------
          As every question with answers to tap is (s2-basics.js): the bird on
-         the right with the question kept in its bubble, three answers under
-         it, every verdict heard only -- a wrong one shakes and the answers
-         are shuffled out of sight, and after three wrong tries the answer is
+         the right asks in its bubble, three answers under it ("Tap the
+         correct answer." heard only), every verdict said in the bubble --
+         a wrong one shakes and is told why (the line for the answer tapped,
+         the sides breathing as it gets to them) and the answers are
+         shuffled out of sight, and after three wrong tries the answer is
          shown; a right (or shown) answer makes way for the working
-         ("Perimeter:" over the sum) as the light walks the boundary. The
-         bird is already there, so it simply asks. */
+         ("Perimeter:" over the sum) and, as its line gets to the adding,
+         the light walks the boundary. The bird is already there, so it
+         simply asks. */
       .then(function () { return K.perchSay('i2Ask'); })
-      .then(function () { return K.perchChoices([28, 30, 26].map(cm)); })
+      .then(function () { return K.perchChoices(OPTS.map(cm)); })
       .then(function (btns) {
-        return K.perchAsk(btns, 1, {
-          onWrong: function () { return K.perchHear('bNotQuite', 'confused'); }
+        K.perchVoice('bTap');
+        return K.perchAsk(btns, RIGHT, {
+          onWrong: function (n, picked) {
+            var w = wrongFor(picked);
+            K.onPhrase(w.key, w.at, function () {
+              if (!answered) return Flow.anim(Beats.partPulse(shape.sides, 1));
+            });
+            return K.perchSay(w.key, 'confused', 'no');
+          }
         });
       })
       .then(function (res) {
-        var told = res.revealed ? K.perchHear('i2Reveal') : K.perchHear('i2Right', 'happy');
+        answered = true;
+        var key = res.revealed ? 'i2Reveal' : 'i2Right';
+        /* armed before the line is said; should the line be cut short, the
+           walk goes once it is over */
+        var adding = K.onPhrase(key, res.revealed ? REVEAL_AT : TOLD_AT, function () {});
+        var said = res.revealed ? 0 : performance.now();
+        var told = res.revealed ? K.perchSay('i2Reveal') : K.perchSay('i2Right', 'happy', 'yes');
         /* a revealed answer is left lit a moment longer: the learner did not find it */
         var work = Flow.wait(res.revealed ? LOOK : BEAT)
           .then(function () { return K.perchClear(); })
@@ -239,9 +293,13 @@
             sum = K.perchSum(T('lblPerimeterIs'), { terms: SUM });
             return Flow.anim(Beats.cardIn(sum.el));
           })
+          .then(function () { return Promise.race([adding, told]); })
           .then(function () {
             /* each side's length carried off its label into the sum */
-            return Flow.anim(Beats.walk(shape, 0.7 * SUM.length, {
+            var pace = 0.7 * SUM.length, secs = walkSecs(key, said, pace);
+            return Flow.anim(Beats.walk(shape, secs, {
+              /* on the voice's clock: an even pace, a side as its length is said */
+              ease: secs !== pace ? 'none' : undefined,
               onSide: function (k) { Beats.lightSide(shape, k, { label: true }); sum.term(String(SUM[k]), shape.ink(k), shape.labels[k]); }
             }));
           })

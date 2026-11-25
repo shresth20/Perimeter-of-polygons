@@ -5,15 +5,20 @@
  * the board, its lengths written on, then carried to the left; the bird
  * jumps up on the right and asks in its bubble, three answers under it
  * ("Tap the correct answer." is heard only) -- the circle game's formula
- * pane, in ice (pages.js: the perch). The question stays in the bubble:
- * every verdict is heard only. A wrong answer shakes and the answers are
- * shuffled out of sight; after three wrong tries the answer is shown. A
- * right (or shown) answer: the answers make way for the working --
- * "Perimeter:" over the sum -- while a light runs round the boundary and
- * each side's length, as it is passed, is carried off its label on the
- * shape and dropped into the sum. Then the three formulas, built one card
- * at a time -- the shape's name over it, its rule on one line under it --
- * each one's rule heard as it is written.
+ * pane, in ice (pages.js: the perch). Every verdict is said in the bubble,
+ * written and heard: a wrong answer shakes, is told why (the line for the
+ * answer tapped, the bubble red; the shape's sides breathe as the line
+ * gets to them) and the answers are shuffled out of sight; after three
+ * wrong tries the answer is shown. A right (or shown) answer: its line in
+ * the bubble (green when right) while the answers make way for the
+ * working -- "Perimeter:" over the sum -- and, as the line gets to the
+ * adding ("8 + 5 + 8 + 5 = 26 cm." / "Add all four sides."), a light runs
+ * round the boundary and each side's length, as it is passed, is carried
+ * off its label on the shape and dropped into the sum. Then the three
+ * formulas, built one card at a time -- the shape's name over it, its rule
+ * on one line under it: as its line is heard, a light runs round its sides
+ * ("A rectangle has two lengths and two breadths."), and its rule is
+ * written as it is said ("So, its perimeter is 2 × (l + b).").
  * ========================================================================== */
 (function (global) {
   'use strict';
@@ -30,21 +35,35 @@
      420), large; once its lengths are on, it is carried left until that
      centre stands at ASIDE_X, the middle of the board's left half -- the
      right half is the bird's. Three answers each: the right one, and the
-     two slips worth answering. `told` is heard on a right answer, `reveal`
-     when the answer is shown after three wrong tries.
+     two slips worth answering, each with its own line (`wrong`, by the
+     answer, with the words at which the shape's sides breathe). `told` is
+     said on a right answer, `reveal` when the answer is shown after three
+     wrong tries; the light walks the sides as each gets to its adding
+     (`toldAt`, REVEAL_AT).
        Every side has its length written on -- all four of the rectangle's
      too -- and sides of one length share one ink. The triangle is drawn a
      size up (12 : 9 : 15, 25 figure units to the cm). */
   var MID_X = 500, ASIDE_X = 250;
-  var WALK_PER_SIDE = 0.8;   /* s: the light's pace round the boundary, a side's length carried each */
+  var WALK_PER_SIDE = 1.0;   /* s: the light's pace round the boundary -- a side a length's carry (Beats.termFly) */
   var QS = [
     { pts: S.rect(332, 105, 336, 210), sum: [8, 5, 8, 5], total: 26,
-      ask: 'b1Ask', opts: [13, 40, 26], right: 2, told: 'b1Right', reveal: 'b1Reveal' },
+      ask: 'b1Ask', opts: [13, 40, 26], right: 2,
+      wrong: { 13: { key: 'b1Wrong13', at: 'has four' }, 40: { key: 'b1Wrong40', at: 'add the sides' } },
+      told: 'b1Right', toldAt: '8 + 5', reveal: 'b1Reveal' },
     { pts: S.rect(386, 96, 228, 228), sum: [15, 15, 15, 15], total: 60,
-      ask: 'b2Ask', opts: [30, 60, 225], right: 1, told: 'b2Right', reveal: 'b2Reveal' },
+      ask: 'b2Ask', opts: [30, 60, 225], right: 1,
+      wrong: { 30: { key: 'b2Wrong30', at: 'has four' }, 225: { key: 'b2Wrong225', at: 'add the sides' } },
+      told: 'b2Right', toldAt: '15 + 15', reveal: 'b2Reveal' },
     { pts: [{ x: 350, y: 97.5 }, { x: 650, y: 97.5 }, { x: 650, y: 322.5 }], sum: [12, 9, 15], total: 36,
-      ask: 'b3Ask', opts: [36, 45, 27], right: 0, told: 'b3Right', reveal: 'b3Reveal' }
+      ask: 'b3Ask', opts: [36, 45, 27], right: 0,
+      wrong: { 45: { key: 'b3Wrong45', at: 'Add 12' }, 27: { key: 'b3Wrong27', at: 'has three' } },
+      told: 'b3Right', toldAt: '12 + 9', reveal: 'b3Reveal' }
   ];
+  /* a wrong answer with no line of its own: the general one */
+  var NOT_QUITE = { key: 'bNotQuite', at: 'all the sides' };
+  var REVEAL_AT = 'Add all';
+  /* a formula card's rule is written as its line gets to it */
+  var RULE_AT = 'So, its perimeter';
 
   var dom = null, group = null, layerNodes = [];
 
@@ -59,6 +78,25 @@
     return e;
   }
 
+  /* The light's time round the shape for a right answer: over the adding
+     its recording says ("8 + 5 + 8 + 5 ="), so each length joins the sum as
+     it is heard -- `said` is when the line began. Its own pace when the
+     line has no word timings, and never slower than that pace. */
+  function walkSecs(key, said, pace) {
+    var I = global.I18n;
+    if (!said || !I || !I.cues || !I.cues(key)) return pace;
+    var left = (K.voiceAt(key, '=') - (performance.now() - said)) / 1000;
+    return Math.max(pace * 0.5, Math.min(pace, left));
+  }
+
+  /* The line for the wrong answer tapped (a pill's label, "13 cm"). */
+  function wrongFor(q, label) {
+    for (var k = 0; k < q.opts.length; k++) {
+      if (cm(q.opts[k]) === label && q.wrong[q.opts[k]]) return q.wrong[q.opts[k]];
+    }
+    return NOT_QUITE;
+  }
+
   /* One question: the shape in the middle, carried aside; the bird's ask;
      the answer; the walk. */
   function question(q, i) {
@@ -67,6 +105,7 @@
     var shape = S.build(g, q.pts, { inks: true, labels: q.sum.map(cm), cls: 'shape--big' });
     var dx = ASIDE_X - MID_X;
     var c = shape.centre();
+    var answered = false;
 
     /* the intro ("Let's find the perimeter...") is said before, in the bubble;
        the header stays shut -- the bird asks from beside the shape */
@@ -83,14 +122,30 @@
       .then(function (btns) {
         K.perchVoice('bTap');
         return K.perchAsk(btns, q.right, {
-          onWrong: function () { return K.perchHear('bNotQuite', 'confused'); }
+          /* the wrong answer told why, in the bubble (red); as the line
+             gets to the sides, they breathe on the shape -- unless the
+             question is answered by then */
+          onWrong: function (n, picked) {
+            var w = wrongFor(q, picked);
+            K.onPhrase(w.key, w.at, function () {
+              if (!answered) return Flow.anim(Beats.partPulse(shape.sides, 1));
+            });
+            return K.perchSay(w.key, 'confused', 'no');
+          }
         });
       })
-      /* right (or shown): heard while the answers make way for the working
-         and the light walks the boundary, each side's length carried from
-         its label on the shape into the sum as it is passed */
+      /* right (or shown): its line in the bubble while the answers make way
+         for the working; as the line gets to the adding, the light walks
+         the boundary, each side's length carried from its label on the
+         shape into the sum as it is passed */
       .then(function (res) {
-        var told = res.revealed ? K.perchHear(q.reveal) : K.perchHear(q.told, 'happy');
+        answered = true;
+        var key = res.revealed ? q.reveal : q.told;
+        /* armed before the line is said; should the line be cut short, the
+           walk goes once it is over */
+        var adding = K.onPhrase(key, res.revealed ? REVEAL_AT : q.toldAt, function () {});
+        var said = res.revealed ? 0 : performance.now();
+        var told = res.revealed ? K.perchSay(q.reveal) : K.perchSay(q.told, 'happy', 'yes');
         var card = null;
         /* a revealed answer is left lit a moment longer: the learner did not find it */
         var work = Flow.wait(res.revealed ? LOOK : BEAT)
@@ -99,12 +154,23 @@
             card = K.perchSum(T('lblPerimeterIs'), { terms: q.sum, total: '= ' + cm(q.total) });
             return Flow.anim(Beats.cardIn(card.el));
           })
+          .then(function () { return Promise.race([adding, told]); })
           .then(function () {
-            return Flow.anim(Beats.walk(shape, WALK_PER_SIDE * q.sum.length, {
-              onSide: function (k) {
+            /* as the light sets off along a side, the side swells and its
+               length leaves its label for the sum -- the two arrive
+               together; once walked, the side is left in the perimeter's
+               yellow, so the boundary is seen to fill in as it is added
+               (on a square, whose sides all wear one ink, this is what
+               shows which 15 is being added) */
+            var pace = WALK_PER_SIDE * q.sum.length, secs = walkSecs(key, said, pace);
+            return Flow.anim(Beats.walk(shape, secs, {
+              /* on the voice's clock: an even pace, a side as its length is said */
+              ease: secs !== pace ? 'none' : undefined,
+              onEnter: function (k) {
                 Beats.lightSide(shape, k, { label: true });
                 card.term(String(q.sum[k]), shape.ink(k), shape.labels[k]);
-              }
+              },
+              onSide: function (k) { shape.sides[k].classList.add('is-tapped'); }
             }));
           })
           .then(function () { return card.total('= ' + cm(q.total)); })
@@ -134,10 +200,13 @@
 
   /* The three formulas, one card at a time -- the rectangle, the square,
      the triangle: the card comes in, its name is set down at the top, its
-     shape is drawn by the pen under it and its sides named; then, as "The
-     perimeter of a rectangle is ..." is heard (the voice only), its rule is
-     written on one line under the shape -- "Perimeter: 2 × (l + b)" -- and
-     a light runs once round the boundary. Then the bird's own line. */
+     shape is drawn by the pen under it and its sides named; then its line
+     is heard (the voice only): as "A rectangle has two lengths and two
+     breadths." is said a light runs once round the boundary, and as "So,
+     its perimeter is 2 × (l + b)." is said its rule is written on one line
+     under the shape -- "Perimeter: 2 × (l + b)". Then the bird's own lines:
+     as "...made of straight sides." is said, every side of the three shapes
+     breathes; then the sum of the sides, for any polygon. */
   function sceneSummary() {
     var grid = h('div', 'grid grid--3 grid--kinds grid--named grid--formulas', dom.layer);
     layerNodes.push(grid);
@@ -161,8 +230,10 @@
         .then(function () {
           return Promise.all([
             K.voiceOver(c.say),
-            Flow.anim(Beats.rowIn(c.sub)).then(function () { return Flow.anim(Beats.ruleIn(c.row)); }),
-            Flow.anim(Beats.walk(c.shape, 2.0))
+            Flow.anim(Beats.walk(c.shape, 2.0)),
+            Flow.wait(K.voiceAt(c.say, RULE_AT)).then(function () {
+              return Flow.anim(Beats.rowIn(c.sub)).then(function () { return Flow.anim(Beats.ruleIn(c.row)); });
+            })
           ]);
         })
         .then(function () { return Flow.wait(SHORT); });
@@ -173,6 +244,12 @@
       .then(function () { return Flow.wait(SHORT); })
       .then(function () {
         return cards.reduce(function (chain, c) { return chain.then(function () { return build(c); }); }, Promise.resolve());
+      })
+      .then(function () { return Flow.wait(BEAT); })
+      .then(function () {
+        var sides = cards.reduce(function (a, c) { return a.concat(c.shape.sides); }, []);
+        K.onPhrase('b4Polygon', 'straight sides', function () { return Flow.anim(Beats.partPulse(sides, 1)); });
+        return K.say('b4Polygon');
       })
       .then(function () { return Flow.wait(BEAT); })
       .then(function () { return K.say('b4Sum', 'happy'); })

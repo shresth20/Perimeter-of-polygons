@@ -49,10 +49,12 @@
   0%, 100% { opacity: .75; }
   50%      { opacity: 1; }
 }
-.shape__area.is-pulsing { animation: area-breathe 1.2s ease-in-out infinite; }
-@keyframes area-breathe {
-  0%, 100% { opacity: .75; }
-  50%      { opacity: 1; }
+/* the lit inside blinks: dark blue, then the card's light blue showing
+   through, and back */
+.shape__area.is-pulsing { animation: area-blink 1.1s ease-in-out infinite; }
+@keyframes area-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .25; }
 }
 
 /* ---- a blank asking to be filled ------------------------------------------ */

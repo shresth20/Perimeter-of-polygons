@@ -373,7 +373,8 @@
      A light sets off from the first corner and runs once round the shape,
      clockwise, with a trail behind it -- the distance all the way round,
      travelled. `onSide(i)` is called as the light finishes side i, so the
-     length can be added as it is walked. The skate's own paths are built
+     length can be added as it is walked; `onEnter(i)` as it sets off along
+     side i, for a length carried WHILE its side is walked. The skate's own paths are built
      onto the shape the first time and kept. `path` may be a custom closed
      path (a composite's outer boundary) instead of the shape's own. */
   var TAILS = [60, 150, 1];
@@ -412,8 +413,15 @@
     if (!o.path) {
       for (var i = 0; i < shape.n; i++) { acc += shape.len(i); ends.push(acc); }
     } else if (o.ends) { ends = o.ends; }
-    var fired = 0;
+    var fired = 0, entered = 0;
     var head = { h: 0 };
+    /* `onEnter(i)`, if given, is called as the light sets off along side i */
+    function enter(all) {
+      while (o.onEnter && entered < ends.length && (all || head.h >= (entered ? ends[entered - 1] : 0))) {
+        o.onEnter(entered);
+        entered++;
+      }
+    }
     var tl = M.timeline({
       revert: function () {
         undash(paths);
@@ -425,6 +433,7 @@
         h: len * laps, duration: M.dur(seconds), ease: o.ease || 'power1.inOut',
         onUpdate: function () {
           place(head.h);
+          enter();
           while (o.onSide && fired < ends.length && head.h >= ends[fired] - 0.5) {
             o.onSide(fired);
             fired++;
@@ -433,6 +442,7 @@
       }, 0)
       .to(sk.g, { opacity: 0, duration: M.dur(0.45), ease: 'power2.in' }, M.gap(Math.max(0, seconds - 0.2)));
     tl.call(function () {
+      enter(true);
       while (o.onSide && fired < ends.length) { o.onSide(fired); fired++; }
     }, null, M.gap(seconds));
     return tl;

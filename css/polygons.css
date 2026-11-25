@@ -53,6 +53,17 @@
   opacity: 0;
   pointer-events: none;
 }
+/* Angles marked (shapes.js angles): a small, thin arc in each corner, in
+   the same dark blue as the equal-side strokes, hidden until a beat shows
+   them -- light enough to leave the figure itself the thing seen. */
+.shape__angle {
+  fill: none;
+  stroke: var(--shape-black);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0;
+  pointer-events: none;
+}
 .shape__side.is-dim { opacity: .28; }
 .shape__hit {
   fill: none;
@@ -109,8 +120,8 @@
 
 /* The two kinds of highlight the warm-up asks about, one colour pair on
    every shape: the boundary, as a thick yellow stroke, and the inside, as a
-   light blue wash -- one layer, the only fill the shape has, with a plain
-   edge round it, so the eye goes to the inside and not the edge. */
+   dark blue wash blinking over the light blue every card wears, with a
+   plain edge round it, so the eye goes to the inside and not the edge. */
 .shape__perim {
   fill: none;
   stroke: var(--perim-glow);
@@ -119,12 +130,14 @@
   stroke-linejoin: round;
   opacity: 0;
 }
+/* the lit inside: dark blue over the card's light blue, blinking
+   (css/animations.css), so the middle of the shape is what is pointed at */
 .shape__area {
-  fill: var(--area-wash);
+  fill: var(--area-lit);
   opacity: 0;
 }
 .shape--area .shape__side { stroke: var(--area-rim); }
-/* a lit boundary's card wears the same light blue inside as a lit inside's */
+/* every warm-up card wears the same light blue inside */
 .shape--area .shape__fill { fill: var(--area-wash); }
 
 /* The light that walks the boundary: a crisp golden band (no blur), a white core and the

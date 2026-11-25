@@ -2,7 +2,7 @@
  * s1-warmup.js -- the warm-up: perimeter or area?
  * --------------------------------------------------------------------------
  * Six shapes, one at a time, each on an ice card with either its boundary
- * lit (yellow) or its inside lit (light blue); the learner swipes the card
+ * lit (yellow) or its inside lit (dark blue, blinking); the learner swipes the card
  * left (Perimeter) or right (Area). The two side panels stay for the whole
  * sorting and keep every card sorted into them. Each page turns by itself
  * once its shape is sorted, and the next shape comes in. After the last one
@@ -24,14 +24,16 @@
   var RECT = S.rect(400, 122, 200, 130);
   var TRI = [{ x: 500, y: 96 }, { x: 592, y: 254 }, { x: 408, y: 254 }];
 
-  /* a right sort is answered "Correct!" alone; a wrong one is told why */
+  /* a right sort is answered "Correct!" alone; a wrong one is told why,
+     and as its line names the lit part (`at`) the shape pops, so what is
+     heard and what moves on the card go together */
   var ITEMS = [
-    { pts: SQUARE, hi: 'perim', answer: 'lblPerimeter', wrong: 'w1Wrong1' },
-    { pts: TRI,    hi: 'area',  answer: 'lblArea',      wrong: 'w1Wrong2' },
-    { pts: RECT,   hi: 'area',  answer: 'lblArea',      wrong: 'w1Wrong3' },
-    { pts: TRI,    hi: 'perim', answer: 'lblPerimeter', wrong: 'w1Wrong4' },
-    { pts: SQUARE, hi: 'area',  answer: 'lblArea',      wrong: 'w1Wrong5' },
-    { pts: RECT,   hi: 'perim', answer: 'lblPerimeter', wrong: 'w1Wrong6' }
+    { pts: SQUARE, hi: 'perim', answer: 'lblPerimeter', wrong: 'w1Wrong1', at: 'boundary' },
+    { pts: TRI,    hi: 'area',  answer: 'lblArea',      wrong: 'w1Wrong2', at: 'whole region' },
+    { pts: RECT,   hi: 'area',  answer: 'lblArea',      wrong: 'w1Wrong3', at: 'whole region' },
+    { pts: TRI,    hi: 'perim', answer: 'lblPerimeter', wrong: 'w1Wrong4', at: '3 sides' },
+    { pts: SQUARE, hi: 'area',  answer: 'lblArea',      wrong: 'w1Wrong5', at: 'inside' },
+    { pts: RECT,   hi: 'perim', answer: 'lblPerimeter', wrong: 'w1Wrong6', at: 'boundary' }
   ];
   /* the recap after the sorting: a square, a triangle and a rectangle in a
      row across the board */
@@ -64,23 +66,40 @@
              y: (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2 };
   }
 
+  /* The shape on its card popping twice about its middle -- its lit part
+     with it -- as a line gets to the words that name that part. */
+  function flash(shape) {
+    var c = shape.centre();
+    var tl = M.timeline({ revert: function () { M.set(shape.g, { clearProps: 'transform' }); } });
+    for (var k = 0; k < 2; k++) {
+      tl.to(shape.g, { scale: 1.08, svgOrigin: c.x + ' ' + c.y, duration: M.dur(0.22), ease: 'power2.out' })
+        .to(shape.g, { scale: 1, svgOrigin: c.x + ' ' + c.y, duration: M.dur(0.34), ease: M.POP });
+    }
+    return tl;
+  }
+
   /* One shape, on its card, lit, swiped, told. The card stays where it
      was sorted. */
   function playItem(it, i) {
     var mid = middleOf(it.pts);
     var card = K.buildCard(group, mid.x, mid.y);
     /* every card wears the same look -- a light blue inside with a plain
-       blue edge -- so only the highlight tells the two apart */
+       blue edge -- so only the highlight tells the two apart: a yellow
+       boundary, or the inside blinking dark blue */
     var shape = S.build(card.g, it.pts, { perim: it.hi === 'perim', area: it.hi === 'area',
                                           cls: 'shape--area' });
     var last = i === ITEMS.length - 1;
     var answered = false, stopHand = null;
 
+    /* every card after the first: the question is back in the header as
+       the card comes in (written, not said again), so the last card's
+       "Correct!" is not left standing over the new one */
+    if (i > 0) K.quiet(K.speak(T('w1Ask')));
     return Flow.anim(Beats.swipeIn(card))
-      /* a lit boundary gets the light blue inside poured in with its outline
-         (then the golden stroke runs round it); a lit inside is drawn as an
-         outline only and gets its one fill from the wash poured in next */
-      .then(function () { return Flow.anim(Beats.drawShape(shape, { time: 0.9, fill: it.hi === 'perim' })); })
+      /* the light blue inside is poured in with the outline; then the golden
+         stroke runs round a lit boundary, or the dark blue is poured into a
+         lit inside and left blinking */
+      .then(function () { return Flow.anim(Beats.drawShape(shape, { time: 0.9 })); })
       .then(function () { return Flow.wait(SHORT); })
       .then(function () {
         return Flow.anim(it.hi === 'perim' ? Beats.perimOn(shape, 1.0) : Beats.areaOn(shape, 0.8));
@@ -100,7 +119,10 @@
         }));
         return K.armSwipe(card, zones, it.answer, {
           onTouch: function () { if (stopHand) { stopHand(); stopHand = null; } },
-          onWrong: function () { K.quiet(K.speakBySentence(it.wrong, 'confused')); }
+          onWrong: function () {
+            K.onPhrase(it.wrong, it.at, function () { if (!answered) return Flow.anim(flash(shape)); });
+            K.quiet(K.speakBySentence(it.wrong, 'confused'));
+          }
         });
       })
       .then(function () {
@@ -125,7 +147,8 @@
   }
 
   /* The sorting done: the panels and the sorted cards go, and the three
-     shapes come back on their own, drawn by the pen; then their boundaries
+     shapes come back on their own, drawn by the pen and filled (none is
+     left hollow); then their boundaries
      run yellow, one after another, while the bird says what the perimeter
      is. The board is left so for the next section's wipe. */
   function recap() {
@@ -139,17 +162,18 @@
         zones = [];
         shapes = RECAP.map(function (pts) { return S.build(group, pts, { perim: true }); });
         return Promise.all(shapes.map(function (s, i) {
-          return Flow.wait(i * 260).then(function () { return Flow.anim(Beats.drawShape(s, { time: 0.8, fill: false })); });
+          return Flow.wait(i * 260).then(function () { return Flow.anim(Beats.drawShape(s, { time: 0.8 })); });
         }));
       })
       .then(function () { return Flow.wait(SHORT); })
       .then(function () {
-        return Promise.all([
-          K.say('w1Define'),
-          Promise.all(shapes.map(function (s, i) {
+        /* the boundaries run as "distance around" is heard */
+        var lit = K.onPhrase('w1Define', 'distance around', function () {
+          return Promise.all(shapes.map(function (s, i) {
             return Flow.wait(i * 420).then(function () { return Flow.anim(Beats.perimOn(s, 1.1)); });
-          }))
-        ]);
+          }));
+        });
+        return Promise.all([K.say('w1Define'), lit]);
       })
       .then(function () { return Flow.wait(BEAT); })
       .then(function () { return K.handOver(); });

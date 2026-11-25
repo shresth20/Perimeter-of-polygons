@@ -577,6 +577,23 @@
       if (!played) return Flow.wait(floor - (Date.now() - from));
     });
   }
+  /* When `phrase` is heard into a line said by the voice alone, in ms from
+     the line's start: by its recording's word cues, else at the pace
+     voiceOver() gives the line -- so a beat set on such a line (there is no
+     typing to time it by) comes in with its words. 0 when the phrase is
+     not in the line. */
+  function voiceAt(key, phrase) {
+    var I = global.I18n;
+    if (!I || Flow.isFast()) return 0;
+    var text = plain(I.t(key));
+    var i = text.indexOf(plain(phrase));
+    if (i <= 0) return 0;
+    var cues = I.cues ? I.cues(key, text) : null;
+    if (!cues) return i * VO_PACE;
+    var cuts = global.Typer.wordCuts(text);
+    for (var w = 0; w < cuts.length && w < cues.length; w++) if (i < cuts[w]) return cues[w];
+    return cues[cues.length - 1];
+  }
   function birdVoice(key) {
     mascot.state('talking');
     return voiceOver(key).then(function () { mascot.settle(); });
@@ -798,9 +815,10 @@
   }
 
   /* ---- the question under the bird ---------------------------------------
-     The question stays in the bubble the whole time: no verdict is written
-     over it -- each is heard (o.onWrong, a promise: the "Not quite!" line,
-     and perchHear for the right answer's line).
+     The question is asked in the bubble; each verdict is said there after
+     it, written and heard (o.onWrong, a promise: the wrong answer's line --
+     handed the answer tapped, so the line can be the one for that answer --
+     and the section's own line for the right answer).
        A wrong pill shakes and goes red. Then the answers are shuffled where
      the learner cannot see it happen: the pills stay where they are, only
      their numbers go for a moment and come back in a new order, every pill
@@ -851,6 +869,8 @@
       wrongs++;
       busy = true;
       hearing(true);
+      /* the answer tapped, read now: the shuffle rewrites the pills */
+      var picked = btn.dataset.name;
       var shook = Flow.anim(Beats.choiceWrong(btn));
       if (wrongs >= most) {
         /* out of tries: once it has shaken, the answer is shown */
@@ -864,7 +884,7 @@
       }
       quiet(Promise.all([
         shook.then(function () { return live ? Flow.anim(reshuffle(btns)) : null; }),
-        o.onWrong ? o.onWrong(wrongs) : null
+        o.onWrong ? o.onWrong(wrongs, picked) : null
       ]).then(function () {
         busy = false;
         hearing(false);
@@ -1685,7 +1705,7 @@
     handOver: handOver, autoTurn: autoTurn,
     openBoard: openBoard, wipeBoard: wipeBoard, interlude: interlude, collapseHeader: collapseHeader, openHeader: openHeader,
     say: say, speak: speakLine, arriveSaying: speakLine, speakBySentence: speakBySentence,
-    keyed: keyed, hear: hear, voiceOver: voiceOver, birdVoice: birdVoice, typedFor: typedFor,
+    keyed: keyed, hear: hear, voiceOver: voiceOver, voiceAt: voiceAt, birdVoice: birdVoice, typedFor: typedFor,
     onWord: onWord, onPhrase: onPhrase,
     birdAway: birdAway, lineAway: lineAway, clearPrompt: clearPrompt, birdOnHeader: birdOnHeader,
     mascotJumpIn: mascotJumpIn, mascotJumpOut: mascotJumpOut,

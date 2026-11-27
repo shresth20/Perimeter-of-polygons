@@ -159,9 +159,9 @@
     var shape = S.build(card.g, it.pts, lookAlike());
     var last = i === ITEMS.length - 1, answered = false, stopHand = null, hinted = false;
     /* every polygon after the first: the question is back in the header as
-       the card comes in (written, not said again), so the last card's
-       "Correct!" is not left standing over the new one */
-    if (i > 0) K.quiet(K.speak(T('o3Ask')));
+       the card comes in -- written and said again, its recording under it --
+       so the last card's "Correct!" is not left standing over the new one */
+    if (i > 0) K.quiet(K.speak(K.keyed('o3Ask')));
     /* a wrong sort: the equal sides are marked, once, as the hint (an
        irregular polygon has none to mark -- its line says why instead) */
     function hint() {

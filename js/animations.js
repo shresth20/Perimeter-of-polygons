@@ -345,19 +345,31 @@
     stroke(tl, p, 0, seconds || 1.1, 'power1.inOut');
     return tl;
   }
+  /* The dark inside fades up where it stands -- no growth, no travel -- and
+     goes straight into its blink. (A growth here once used a px
+     transformOrigin, which SVG reads from the bounding box: the wash swept
+     in from the right, i.e. from the Area panel, giving the answer away.) */
   function areaOn(shape, seconds) {
-    var a = shape.area, c = shape.centre();
+    var a = shape.area;
     a.classList.remove('is-pulsing');
+    M.set(a, { clearProps: 'transform' });
     var tl = M.timeline({
-      willChange: a, willChangeValue: 'transform, opacity',
+      willChange: a, willChangeValue: 'opacity',
       revert: function () { a.classList.add('is-pulsing'); }
     });
-    tl.fromTo(a, { opacity: 0, scale: 0.2, transformOrigin: c.x + 'px ' + c.y + 'px' },
-                 { opacity: 1, scale: 1, duration: M.dur(seconds || 0.8), ease: 'power2.out' });
+    tl.fromTo(a, { opacity: 0 }, { opacity: 1, duration: M.dur(seconds || 0.8), ease: 'power2.out' });
     return tl;
   }
+  /* Both highlights put out. The blink/breathe is a CSS animation, which
+     would override the tween's inline opacity, so it is stopped first --
+     holding the opacity it had reached, so the fade starts from there. */
   function highlightOff(shape) {
     var els = [shape.perim, shape.area].filter(Boolean);
+    els.forEach(function (e) {
+      var now = global.getComputedStyle(e).opacity;
+      e.classList.remove('is-pulsing');
+      M.set(e, { opacity: now });
+    });
     var tl = M.timeline({
       revert: function () {
         els.forEach(function (e) { e.classList.remove('is-pulsing'); });

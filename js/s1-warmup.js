@@ -92,9 +92,9 @@
     var answered = false, stopHand = null;
 
     /* every card after the first: the question is back in the header as
-       the card comes in (written, not said again), so the last card's
-       "Correct!" is not left standing over the new one */
-    if (i > 0) K.quiet(K.speak(T('w1Ask')));
+       the card comes in -- written and said again, its recording under it --
+       so the last card's "Correct!" is not left standing over the new one */
+    if (i > 0) K.quiet(K.speak(K.keyed('w1Ask')));
     return Flow.anim(Beats.swipeIn(card))
       /* the light blue inside is poured in with the outline; then the golden
          stroke runs round a lit boundary, or the dark blue is poured into a
@@ -128,9 +128,10 @@
       .then(function () {
         answered = true;
         if (stopHand) { stopHand(); stopHand = null; }
-        /* landed in its panel: the golden boundary fades out, leaving the
-           shape's plain outline -- nothing glows once it is sorted */
-        if (shape.perim) K.quiet(Flow.anim(Beats.highlightOff(shape)));
+        /* landed in its panel: the golden boundary or the blinking dark
+           inside fades out, leaving the plain light blue shape -- every
+           sorted card looks alike, nothing glows once it is sorted */
+        K.quiet(Flow.anim(Beats.highlightOff(shape)));
         return Flow.wait(Beats.ringing());
       })
       .then(function () { return K.speakBySentence('fbCorrect', 'happy'); })

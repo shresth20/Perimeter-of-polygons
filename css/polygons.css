@@ -453,6 +453,28 @@
   white-space: nowrap;
 }
 .grid--formulas .card__formula .card__sub { margin: 0; }
+/* The rule read along with the voice (s2-basics.js readAlong): each mark --
+   "Perimeter:", "2", "×", "(" ... -- lit as its word is heard, by a gold
+   highlighter behind it that fades in and out (opacity only; the mark's
+   small lift is a transform, in the script). */
+/* the row is the layer every highlighter sits in, behind all of its text,
+   so a lit mark never covers the one beside it ("(l") */
+.card__formula { isolation: isolate; }
+.card__formula .fx-ch { position: relative; display: inline-block; }
+.card__formula .fx-ch::after {
+  content: '';
+  position: absolute;
+  inset: -.08em -.16em;
+  border-radius: .3em;
+  background: var(--gold);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity .16s ease-out;
+}
+.card__formula .fx-ch.is-said::after { opacity: .8; transition: opacity .1s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .card__formula .fx-ch::after { transition: none; }
+}
 .rule-line {
   position: absolute;
   left: 50%;
